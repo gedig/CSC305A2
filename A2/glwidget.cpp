@@ -4,9 +4,12 @@
 
 #include "glwidget.h"
 
+#define PLANE_SIZE 100
+#define GRID_DISTANCE 1
 
 
-const double lim=0.5;
+#define MAX_ZOOM 100
+#define MIN_ZOOM 7
 const double RadPerPixel = - 0.01;
 const double MovePerPixel = - 0.1;
 
@@ -40,28 +43,10 @@ void GLWidget::clear()
 
 void GLWidget::initializeGL()
 {
-
-//    GLfloat whiteDir[4] = {2.0, 2.0, 2.0, 1.0};
-//    GLfloat whiteAmb[4] = {1.0, 1.0, 1.0, 1.0};
-//    GLfloat lightPos[4] = {30.0, 30.0, 30.0, 1.0};
-
-//    glEnable(GL_LIGHTING);
-//    glEnable(GL_LIGHT0);
-//    glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, GL_FALSE);
-//    glLightModelfv(GL_LIGHT_MODEL_AMBIENT, whiteAmb);
-
-//    glMaterialfv(GL_FRONT, GL_DIFFUSE, whiteDir);
-//    glMaterialfv(GL_FRONT, GL_SPECULAR, whiteDir);
-//    glMaterialf(GL_FRONT, GL_SHININESS, 20.0);
-
-//    glLightfv(GL_LIGHT0, GL_DIFFUSE, whiteDir);		// enable diffuse
-//    glLightfv(GL_LIGHT0, GL_SPECULAR, whiteDir);	// enable specular
-//    glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
-
     glShadeModel( GL_SMOOTH );
 
     // Set up various other stuff
-    glClearColor( 0.5, 1.0, 0.75, 0.0 ); // Let OpenGL clear to black
+    glClearColor( 0.1, 0.1, 0.1, 0.0 ); // Let OpenGL clear to black
     glEnable( GL_CULL_FACE );  	// don't need Z testing for convex objects
     glHint( GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST );
 }
@@ -80,22 +65,46 @@ void GLWidget::paintGL()
               CameraPos.y,
               CameraPos.z, 0, 0, 0, 0.0, 1.0, 0.0);
 
+    glBegin(GL_QUADS);
+    glColor3f(0.6, 0.6, 1.0);
+    glVertex3f( -PLANE_SIZE, 0, -PLANE_SIZE);
+    glVertex3f( -PLANE_SIZE, 0, PLANE_SIZE);
+    glVertex3f( PLANE_SIZE, 0, PLANE_SIZE);
+    glVertex3f( PLANE_SIZE, 0, -PLANE_SIZE);
+    glEnd();
+
+    glBegin(GL_LINES);
+    for(int i = -PLANE_SIZE; i <= PLANE_SIZE; i += GRID_DISTANCE) {
+        glColor3f(.2, .2, .2);
+        glVertex3f(i,0,-PLANE_SIZE);
+        glVertex3f(i,0,PLANE_SIZE);
+        glVertex3f(-PLANE_SIZE,0,i);
+        glVertex3f(PLANE_SIZE,0,i);
+    };
+    glEnd();
+
     glLineWidth(3);
     glColor3f(1.0, 0.0, 0.0);
     glBegin(GL_LINES);
-    glVertex3f(0.0, 0.0, 0.0);
+    glVertex3f(-100.0, 0.0, 0.0);
     glVertex3f(100, 0, 0);
-    glEnd();
-    glColor3f(0.0, 1.0, 0.0);
-    glBegin(GL_LINES);
-    glVertex3f(0.0, 0.0, 0.0);
-    glVertex3f(0.0f, 1000.0f, 0.0f);
     glEnd();
     glColor3f(0.0, 0.0, 1.0);
     glBegin(GL_LINES);
+    glVertex3f(0.0, 0.0, -100.0);
+    glVertex3f(0, 0, 100.0f);
+    glColor3f(0.0, 1.0, 0.0);
+    glBegin(GL_LINES);
     glVertex3f(0.0, 0.0, 0.0);
-    glVertex3f(0, 0, 1000.0f);
+    glVertex3f(0.0f, 100.0f, 0.0f);
     glEnd();
+
+    for (int i = 1; i < pointList.size(); i++) {
+        glBegin(GL_LINES);
+        glVertex3f(pointList[i-1].x, pointList[i-1].y, pointList[i-1].z);
+        glVertex3f(pointList[i].x, pointList[i].y, pointList[i].z);
+        glEnd();
+    }
 }
 
 /* 2D */
@@ -149,11 +158,6 @@ void GLWidget::initLight()
 
 }
 
-void GLWidget::createAxes( )
-{
-
-}
-
 void GLWidget::mousePressEvent( QMouseEvent *e )
 {
     if (e->button() == Qt::LeftButton)
@@ -165,6 +169,11 @@ void GLWidget::mousePressEvent( QMouseEvent *e )
         Scaling = true;
     } else if (e->button() == Qt::MiddleButton) {
         //TODO-DG: Create a point when middle mouse button is clicked
+        Vector3d mVector = Vector3d();
+        mVector.x = e->pos().x();
+        mVector.y = e->pos().y();
+        mVector.z = 0.0;
+        pointList.push_back(mVector);
     }
 }
 
@@ -245,7 +254,7 @@ void GLWidget::DoScale(QPoint desc, QPoint orig)
 {
     double length = sqrt(CameraPos.x * CameraPos.x + CameraPos.y * CameraPos.y);
     double newLength = length + (desc.y() - orig.y()) * MovePerPixel;
-    if (newLength > lim)
+    if (newLength <= MAX_ZOOM && newLength >= MIN_ZOOM)
     {
         double ratio = newLength / length;
         CameraPos.x = CameraPos.x * ratio;

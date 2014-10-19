@@ -55,17 +55,16 @@ private:
     void dopan(int x, int y, bool click);
     void zoomWheel(int z);
     void displayImage();
-    // for display list
 
     // Functions
     void redraw();
     void initLight();
 
-    void createAxes();
-
     Vector3d CameraPos;
     QPoint lastMousePoint;
 
+
+    QVector<Vector3d> pointList;
 
     bool Rotating;
     bool Scaling;
