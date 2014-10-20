@@ -60,10 +60,13 @@ private:
     // Functions
     void redraw();
     void initLight();
+    QVector3D convertWindowToWorld(float x, float y, float z);
+    int nearestPointToRay(int mouseX, int mouseY);
 
     Vector3d CameraPos;
     QPoint lastMousePoint;
     QPoint initialMousePoint;
+    int selectedPoint;
 
 
     QVector<QVector3D> pointList;

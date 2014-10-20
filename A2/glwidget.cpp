@@ -11,38 +11,12 @@
 #define MAX_ZOOM 100
 #define MIN_ZOOM 7
 #define POINT_RADIUS .1
-#define MIN_MOUSE_MOVE 9
+#define MIN_MOUSE_MOVE 16
+#define POINT_HANDLE_LENGTH 0.3
+#define POINT_HANDLE_WIDTH 5
 const double RadPerPixel = - 0.01;
 const double MovePerPixel = - 0.1;
 const float DEG2RAD = 3.14159/180;
-
-QVector3D convertWindowToWorld(float x, float y, float z)
-{
-    GLint viewport[4];
-    GLdouble modelview[16];
-    GLdouble projection[16];
-    GLfloat winX, winY, winZ;
-    GLdouble worldX, worldY, worldZ;
-
-    glGetDoublev( GL_MODELVIEW_MATRIX, modelview);
-    glGetDoublev(GL_PROJECTION_MATRIX, projection);
-    glGetIntegerv(GL_VIEWPORT, viewport);
-
-    winX = x;
-    winY = viewport[3] - y;
-    winZ = z;
-
-    gluUnProject(winX, winY, winZ, modelview, projection, viewport, &worldX, &worldY, &worldZ);
-
-    QVector3D worldPoint(worldX, worldY, worldZ);
-    return worldPoint;
-}
-
-void calculateMouseRay(QVector3D &startingPoint, QVector3D &direction, int mouseX, int mouseY)
-{
-    startingPoint = convertWindowToWorld(mouseX, mouseY, 0.0);
-    direction = convertWindowToWorld(mouseX, mouseY, 1.0);
-}
 
 GLWidget::GLWidget(QWidget *parent)
     : QGLWidget(parent)
@@ -65,6 +39,7 @@ void GLWidget::startup()
     CameraPos.x = CameraPos.y = CameraPos.z = 5;
     Rotating = false;
     Scaling = false;
+    selectedPoint = -1;
 }
 
 void GLWidget::clear()
@@ -133,14 +108,28 @@ void GLWidget::paintGL()
     glVertex3f(0.0f, 100.0f, 0.0f);
     glEnd();
 
-    // Draws circles at every point, with a line between them.
-    // TODO-DG: Turn this line into a catmull spline
+    // Draws circles at every point, with catmull splines where they can be computed.
     for (int i = 0; i < pointList.size(); i++) {
         glPushMatrix();
         glTranslatef(pointList[i].x(), pointList[i].y(), pointList[i].z());
         GLUquadric* quad = gluNewQuadric();
         gluSphere(quad, GLdouble(POINT_RADIUS), GLint(30), GLint(30));
         glPopMatrix(); // Applies the transform to the sphere without affecting the lines.
+
+        if (i == selectedPoint) {
+            glLineWidth(POINT_HANDLE_WIDTH);
+            glColor3f(0.0, 0.0, 1.0);
+            glBegin(GL_LINES);
+            glVertex3f(pointList[i].x(), pointList[i].y(), pointList[i].z());
+            glVertex3f(pointList[i].x() + POINT_HANDLE_LENGTH, pointList[i].y(), pointList[i].z());
+            glVertex3f(pointList[i].x(), pointList[i].y(), pointList[i].z());
+            glVertex3f(pointList[i].x(), pointList[i].y() + POINT_HANDLE_LENGTH, pointList[i].z());
+            glVertex3f(pointList[i].x(), pointList[i].y(), pointList[i].z());
+            glVertex3f(pointList[i].x(), pointList[i].y(), pointList[i].z() + POINT_HANDLE_LENGTH);
+            glEnd();
+            glColor3f(0.0, 1.0, 0.0);
+            glLineWidth(3);
+        }
 
         // TODO-DG: Don't draw a line between the points, draw the catmull spline.
         if (i > 0) {
@@ -209,6 +198,54 @@ void GLWidget::initLight()
 
 }
 
+QVector3D GLWidget::convertWindowToWorld(float x, float y, float z)
+{
+    GLint viewport[4];
+    GLdouble modelview[16];
+    GLdouble projection[16];
+    GLfloat winX, winY, winZ;
+    GLdouble worldX, worldY, worldZ;
+
+    glGetDoublev( GL_MODELVIEW_MATRIX, modelview);
+    glGetDoublev(GL_PROJECTION_MATRIX, projection);
+    glGetIntegerv(GL_VIEWPORT, viewport);
+
+    winX = x;
+    winY = viewport[3] - y;
+    winZ = z;
+
+    gluUnProject(winX, winY, winZ, modelview, projection, viewport, &worldX, &worldY, &worldZ);
+
+    return QVector3D(worldX, worldY, worldZ);
+}
+
+int GLWidget::nearestPointToRay(int mouseX, int mouseY) {
+    int nearestPoint = -1;
+    float smallestT = -1;
+    for (int i = 0; i < pointList.size(); i++) {
+        QVector3D cameraRayStart = convertWindowToWorld(mouseX, mouseY, 0.0);
+        QVector3D cameraRayDirection = convertWindowToWorld(mouseX, mouseY, 1.0);
+
+        QVector3D rayOriginMinusSphereCenter = cameraRayStart - pointList[i];
+
+        float partA = cameraRayDirection.lengthSquared();
+        float partB = QVector3D::dotProduct(cameraRayDirection, rayOriginMinusSphereCenter);
+        float partC = rayOriginMinusSphereCenter.lengthSquared() - (POINT_RADIUS * POINT_RADIUS);
+
+        float discriminant = (partB * partB) - (partA* partC);
+
+        if (discriminant >= 0) {
+            float t = (-partB - discriminant) / partA;
+            // Calculate the smaller T value and test it against smallestT
+            if (t < smallestT || smallestT == -1) {
+                smallestT = t;
+                nearestPoint = i;
+            }
+        }
+    }
+    return nearestPoint;
+}
+
 void GLWidget::mousePressEvent( QMouseEvent *e )
 {
     if (e->button() == Qt::LeftButton)
@@ -242,7 +279,8 @@ void GLWidget::mouseReleaseEvent( QMouseEvent *e)
             DoRotate(e->pos(), lastMousePoint);
             Rotating = false;
         } else {
-            // TODO-DG: If movement is insignificant, ray trace for point to select.
+            // If movement is insignificant, ray trace for point to select.
+            selectedPoint = nearestPointToRay(e->pos().x(), e->pos().y());
         }
 
     }
@@ -256,10 +294,11 @@ void GLWidget::mouseReleaseEvent( QMouseEvent *e)
             DoScale(e->pos(), lastMousePoint);
             Scaling = false;
         } else {
-            // TODO-DG: If movement is insignificant, ray trace for point to delete.
-            QVector3D cameraRayStart;
-            QVector3D cameraRayDirection;
-            calculateMouseRay(cameraRayStart, cameraRayDirection, e->pos().x(), e->pos().y());
+            //  If movement is insignificant, test ray against each object.
+            int nearestPoint = nearestPointToRay(e->pos().x(), e->pos().y());
+            if (nearestPoint >= 0) {
+                pointList.remove(nearestPoint);
+            }
         }
     }
 
