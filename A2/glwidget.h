@@ -32,6 +32,7 @@ public:
 
     void clear();
     void help();
+    void clearPoints();
 
 protected:
     //Initialize the OpenGL Graphics Engine

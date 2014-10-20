@@ -12,6 +12,44 @@
 #define MIN_ZOOM 7
 const double RadPerPixel = - 0.01;
 const double MovePerPixel = - 0.1;
+const float DEG2RAD = 3.14159/180;
+
+Vector3d convertWindowToWorld(float x, float y, float z)
+{
+    GLint viewport[4];
+    GLdouble modelview[16];
+    GLdouble projection[16];
+    GLfloat winX, winY, winZ;
+    GLdouble worldX, worldY, worldZ;
+
+    glGetDoublev( GL_MODELVIEW_MATRIX, modelview);
+    glGetDoublev(GL_PROJECTION_MATRIX, projection);
+    glGetIntegerv(GL_VIEWPORT, viewport);
+
+    winX = x;
+    winY = viewport[3] - y;
+    winZ = z;
+
+    gluUnProject(winX, winY, winZ, modelview, projection, viewport, &worldX, &worldY, &worldZ);
+
+    Vector3d worldPoint;
+    worldPoint.x = worldX;
+    worldPoint.y = worldY;
+    worldPoint.z = worldZ;
+    return worldPoint;
+}
+
+void calculateMouseRay(Vector3d &startingPoint, Vector3d &direction, int mouseX, int mouseY)
+{
+    Vector3d tempVector = convertWindowToWorld(mouseX, mouseY, 0.0);
+    startingPoint.x = tempVector.x;
+    startingPoint.y = tempVector.y;
+    startingPoint.z = tempVector.z;
+    tempVector = convertWindowToWorld(mouseX, mouseY, 1.0);
+    direction.x = tempVector.x;
+    direction.y = tempVector.y;
+    direction.z = tempVector.z;
+}
 
 GLWidget::GLWidget(QWidget *parent)
     : QGLWidget(parent)
@@ -65,6 +103,7 @@ void GLWidget::paintGL()
               CameraPos.y,
               CameraPos.z, 0, 0, 0, 0.0, 1.0, 0.0);
 
+    // Draws the xz plane
     glBegin(GL_QUADS);
     glColor3f(0.6, 0.6, 1.0);
     glVertex3f( -PLANE_SIZE, 0, -PLANE_SIZE);
@@ -73,6 +112,7 @@ void GLWidget::paintGL()
     glVertex3f( PLANE_SIZE, 0, -PLANE_SIZE);
     glEnd();
 
+    // Draws the grid on the xz plane.
     glBegin(GL_LINES);
     for(int i = -PLANE_SIZE; i <= PLANE_SIZE; i += GRID_DISTANCE) {
         glColor3f(.2, .2, .2);
@@ -83,6 +123,7 @@ void GLWidget::paintGL()
     };
     glEnd();
 
+    // Draws the axis lines
     glLineWidth(3);
     glColor3f(1.0, 0.0, 0.0);
     glBegin(GL_LINES);
@@ -99,11 +140,22 @@ void GLWidget::paintGL()
     glVertex3f(0.0f, 100.0f, 0.0f);
     glEnd();
 
-    for (int i = 1; i < pointList.size(); i++) {
-        glBegin(GL_LINES);
-        glVertex3f(pointList[i-1].x, pointList[i-1].y, pointList[i-1].z);
-        glVertex3f(pointList[i].x, pointList[i].y, pointList[i].z);
-        glEnd();
+    // Draws circles at every point, with a line between them.
+    // TODO-DG: Turn this line into a catmull spline
+    for (int i = 0; i < pointList.size(); i++) {
+        glPushMatrix();
+        glTranslatef(pointList[i].x, pointList[i].y, pointList[i].z);
+        GLUquadric* quad = gluNewQuadric();
+        gluSphere(quad, GLdouble(0.1), GLint(30), GLint(30));
+        glPopMatrix(); // Applies the transform to the sphere without affecting the lines.
+
+        // TODO-DG: Don't draw a line between the points, draw the catmull spline.
+        if (i > 0) {
+            glBegin(GL_LINES);
+            glVertex3f(pointList[i-1].x, pointList[i-1].y, pointList[i-1].z);
+            glVertex3f(pointList[i].x, pointList[i].y, pointList[i].z);
+            glEnd();
+        }
     }
 }
 
@@ -122,11 +174,17 @@ void GLWidget::help()
     QString helpString;
     QString title="Application Help";
 
-    helpString="Control Information goes here: ";
+    helpString = "Controls: \nLeft mouse button rotates the camera and selects points.";
+    helpString += "\nRight mouse button controls zoom and deletes points.";
+    helpString += "\nMiddle mouse button adds points.";
     QMessageBox::information( this, title, helpString, QMessageBox::Ok );
 }
 
-
+void GLWidget::clearPoints()
+{
+    pointList.clear();
+    clear();
+}
 
 
 void GLWidget::initLight()
@@ -168,25 +226,28 @@ void GLWidget::mousePressEvent( QMouseEvent *e )
         lastMousePoint = e->pos();
         Scaling = true;
     } else if (e->button() == Qt::MiddleButton) {
-        //TODO-DG: Create a point when middle mouse button is clicked
-        Vector3d mVector = Vector3d();
-        mVector.x = e->pos().x();
-        mVector.y = e->pos().y();
-        mVector.z = 0.0;
-        pointList.push_back(mVector);
+        //Create a point when middle mouse button is clicked
+        Vector3d mVector = convertWindowToWorld( e->pos().x(), e->pos().y());
+        if (mVector.y >= 0) {
+            pointList.push_back(mVector);
+        }
     }
 }
+
+
 
 void GLWidget::mouseReleaseEvent( QMouseEvent *e)
 {
     if (e->button() == Qt::LeftButton && Rotating)
     {
+        // TODO-DG: If movement is insignificant, ray trace for point to select.
         DoRotate(e->pos(), lastMousePoint);
         Rotating = false;
     }
 
     if (e->button() == Qt::RightButton && Scaling)
     {
+        // TODO-DG: If movement is insignificant, ray trace for point to delete.
         DoScale(e->pos(), lastMousePoint);
         Scaling = false;
     }

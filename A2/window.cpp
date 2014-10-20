@@ -48,3 +48,8 @@ void Window::on_pushButton_clicked()
     // TODO-DG: Switch view between orthographic and perspective.
     qDebug() << "clicked";
 }
+
+void Window::on_pushButton_2_clicked()
+{
+    m_glWidget->clearPoints();
+}
