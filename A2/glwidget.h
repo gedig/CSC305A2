@@ -72,11 +72,14 @@ private:
     QVector<QVector3D> pointList;
 
     bool Rotating;
+    enum Dragging { NONE, X, Y, Z };
+    Dragging dragAxis;
     bool Scaling;
     void RotateY(Vector3d * vec_in, double rad);
     void RotateZ(Vector3d * vec_in, double rad);
     void DoRotate(QPoint desc, QPoint orig);
     void DoScale(QPoint desc, QPoint orig);
+    void DoDrag(QPoint desc, QPoint orig);
 };
 
 

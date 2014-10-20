@@ -12,11 +12,10 @@
 #define MIN_ZOOM 7
 #define POINT_RADIUS .1
 #define MIN_MOUSE_MOVE 16
-#define POINT_HANDLE_LENGTH 0.3
+#define POINT_HANDLE_LENGTH 0.2
 #define POINT_HANDLE_WIDTH 5
 const double RadPerPixel = - 0.01;
 const double MovePerPixel = - 0.1;
-const float DEG2RAD = 3.14159/180;
 
 GLWidget::GLWidget(QWidget *parent)
     : QGLWidget(parent)
@@ -38,6 +37,7 @@ void GLWidget::startup()
     version=MYVERSION;
     CameraPos.x = CameraPos.y = CameraPos.z = 5;
     Rotating = false;
+    dragAxis = NONE;
     Scaling = false;
     selectedPoint = -1;
 }
@@ -97,13 +97,10 @@ void GLWidget::paintGL()
     glBegin(GL_LINES);
     glVertex3f(-100.0, 0.0, 0.0);
     glVertex3f(100, 0, 0);
-    glEnd();
     glColor3f(0.0, 0.0, 1.0);
-    glBegin(GL_LINES);
     glVertex3f(0.0, 0.0, -100.0);
     glVertex3f(0, 0, 100.0f);
     glColor3f(0.0, 1.0, 0.0);
-    glBegin(GL_LINES);
     glVertex3f(0.0, 0.0, 0.0);
     glVertex3f(0.0f, 100.0f, 0.0f);
     glEnd();
@@ -127,6 +124,19 @@ void GLWidget::paintGL()
             glVertex3f(pointList[i].x(), pointList[i].y(), pointList[i].z());
             glVertex3f(pointList[i].x(), pointList[i].y(), pointList[i].z() + POINT_HANDLE_LENGTH);
             glEnd();
+
+            glPushMatrix();
+            glTranslatef(pointList[i].x() + POINT_RADIUS*2, pointList[i].y(), pointList[i].z());
+            gluSphere(quad, GLdouble(POINT_RADIUS/2), GLint(30), GLint(30));
+            glPopMatrix();
+            glPushMatrix();
+            glTranslatef(pointList[i].x(), pointList[i].y() + POINT_RADIUS*2, pointList[i].z());
+            gluSphere(quad, GLdouble(POINT_RADIUS/2), GLint(30), GLint(30));
+            glPopMatrix();
+            glPushMatrix();
+            glTranslatef(pointList[i].x(), pointList[i].y(), pointList[i].z() + POINT_RADIUS*2);
+            gluSphere(quad, GLdouble(POINT_RADIUS/2), GLint(30), GLint(30));
+            glPopMatrix();
             glColor3f(0.0, 1.0, 0.0);
             glLineWidth(3);
         }
@@ -164,6 +174,7 @@ void GLWidget::help()
 
 void GLWidget::clearPoints()
 {
+    selectedPoint = -1;
     pointList.clear();
     clear();
 }
@@ -250,9 +261,55 @@ void GLWidget::mousePressEvent( QMouseEvent *e )
 {
     if (e->button() == Qt::LeftButton)
     {
+        if (selectedPoint >= 0) { // If there is a selected point, we have to see if the user is moving it.
+            QVector3D cameraRayStart = convertWindowToWorld(e->pos().x(), e->pos().y(), 0.0);
+            QVector3D cameraRayDirection = convertWindowToWorld(e->pos().x(), e->pos().y(), 1.0);
+            for (int i = 0; i < 3; i++) {
+                QVector3D sphereCenter = QVector3D(pointList[selectedPoint]);
+                switch (i) {
+                    case 0:
+                        sphereCenter += QVector3D(POINT_RADIUS*2, 0, 0);
+                        break;
+                    case 1:
+                        sphereCenter += QVector3D(0, POINT_RADIUS*2, 0);
+                        break;
+                    case 2:
+                        sphereCenter += QVector3D(0, 0, POINT_RADIUS*2);
+                        break;
+                    default:
+                        break;
+                }
+
+                QVector3D rayOriginMinusSphereCenter = cameraRayStart - sphereCenter;
+
+                float partA = cameraRayDirection.lengthSquared();
+                float partB = QVector3D::dotProduct(cameraRayDirection, rayOriginMinusSphereCenter);
+                float partC = rayOriginMinusSphereCenter.lengthSquared() - (POINT_RADIUS * POINT_RADIUS)/2;
+
+                float discriminant = (partB * partB) - (partA* partC);
+
+                if (discriminant >= 0) {
+                    switch (i) {
+                    case 0:
+                        dragAxis = X;
+                        break;
+                    case 1:
+                        dragAxis = Y;
+                        break;
+                    case 2:
+                        dragAxis = Z;
+                        break;
+                    default:
+                        break;
+                    }
+                }
+            }
+        }
+        if (dragAxis == NONE) {
+            Rotating = true;
+        }
         lastMousePoint = e->pos();
         initialMousePoint = e->pos();
-        Rotating = true;
     } else if (e->button() == Qt::RightButton) {
         lastMousePoint = e->pos();
         initialMousePoint = e->pos();
@@ -270,19 +327,19 @@ void GLWidget::mousePressEvent( QMouseEvent *e )
 
 void GLWidget::mouseReleaseEvent( QMouseEvent *e)
 {
-    if (e->button() == Qt::LeftButton && Rotating)
+    if (e->button() == Qt::LeftButton)
     {
         float x = initialMousePoint.x() - e->pos().x();
         float y = initialMousePoint.y() - e->pos().y();
         float pointDistanceSquared = x*x + y*y;
-        if (pointDistanceSquared > MIN_MOUSE_MOVE) {
+        if (pointDistanceSquared > MIN_MOUSE_MOVE && Rotating) {
             DoRotate(e->pos(), lastMousePoint);
             Rotating = false;
-        } else {
+        } else if (pointDistanceSquared < MIN_MOUSE_MOVE) {
             // If movement is insignificant, ray trace for point to select.
             selectedPoint = nearestPointToRay(e->pos().x(), e->pos().y());
         }
-
+        dragAxis = NONE;
     }
 
     if (e->button() == Qt::RightButton && Scaling)
@@ -307,10 +364,14 @@ void GLWidget::mouseReleaseEvent( QMouseEvent *e)
 
 void GLWidget::mouseMoveEvent( QMouseEvent *e )
 {
-    if ((e->buttons() & Qt::LeftButton) && Rotating)
+    if ((e->buttons() & Qt::LeftButton) )
     {
-        DoRotate(e->pos(), lastMousePoint);
-        lastMousePoint = e->pos();
+        if (Rotating) {
+            DoRotate(e->pos(), lastMousePoint);
+            lastMousePoint = e->pos();
+        } else if (dragAxis != NONE && selectedPoint != -1) {
+            DoDrag(e->pos(), lastMousePoint);
+        }
     }
 
     if ((e->buttons() & Qt::RightButton) && Scaling)
@@ -371,5 +432,26 @@ void GLWidget::DoScale(QPoint desc, QPoint orig)
         CameraPos.x = CameraPos.x * ratio;
         CameraPos.y = CameraPos.y * ratio;
         CameraPos.z = CameraPos.z * ratio;
+    }
+}
+
+// Moves pointList[selectedPoint] by desc.axis - orig.axis in whichever axis is selected.
+void GLWidget::DoDrag(QPoint desc, QPoint orig)
+{
+    float xDist = desc.x() - orig.x();
+//    float distance = (desc.x()-orig.x())*(desc.x()-orig.x()) + (desc.y()-orig.y())*(desc.y()-orig.y());
+//    distance /= 1000.0f;
+    switch (dragAxis) {
+        case X:
+            //pointList[selectedPoint] = QVector3D(pointToMoveTo.x(), pointList[selectedPoint].y(), pointList[selectedPoint].z());
+        pointList[selectedPoint] += QVector3D(xDist * .001, 0, 0);
+        case Y:
+            //pointList[selectedPoint] = QVector3D(pointList[selectedPoint].x(), pointToMoveTo.x(), pointList[selectedPoint].z());
+            pointList[selectedPoint] += QVector3D(0, xDist * .001, 0);
+        case Z:
+            //pointList[selectedPoint] = QVector3D(pointToMoveTo.x(), pointList[selectedPoint].y(), pointList[selectedPoint].z());
+            pointList[selectedPoint] += QVector3D(0, 0, xDist * .001);
+        default:
+            break;
     }
 }
