@@ -10,6 +10,8 @@
 
 #define MAX_ZOOM 100
 #define MIN_ZOOM 7
+#define POINT_RADIUS .1
+#define MIN_MOUSE_MOVE 9
 const double RadPerPixel = - 0.01;
 const double MovePerPixel = - 0.1;
 const float DEG2RAD = 3.14159/180;
@@ -146,7 +148,7 @@ void GLWidget::paintGL()
         glPushMatrix();
         glTranslatef(pointList[i].x, pointList[i].y, pointList[i].z);
         GLUquadric* quad = gluNewQuadric();
-        gluSphere(quad, GLdouble(0.1), GLint(30), GLint(30));
+        gluSphere(quad, GLdouble(POINT_RADIUS), GLint(30), GLint(30));
         glPopMatrix(); // Applies the transform to the sphere without affecting the lines.
 
         // TODO-DG: Don't draw a line between the points, draw the catmull spline.
@@ -221,13 +223,15 @@ void GLWidget::mousePressEvent( QMouseEvent *e )
     if (e->button() == Qt::LeftButton)
     {
         lastMousePoint = e->pos();
+        initialMousePoint = e->pos();
         Rotating = true;
     } else if (e->button() == Qt::RightButton) {
         lastMousePoint = e->pos();
+        initialMousePoint = e->pos();
         Scaling = true;
     } else if (e->button() == Qt::MiddleButton) {
         //Create a point when middle mouse button is clicked
-        Vector3d mVector = convertWindowToWorld( e->pos().x(), e->pos().y());
+        Vector3d mVector = convertWindowToWorld( e->pos().x(), e->pos().y(), 0.1);
         if (mVector.y >= 0) {
             pointList.push_back(mVector);
         }
@@ -240,16 +244,32 @@ void GLWidget::mouseReleaseEvent( QMouseEvent *e)
 {
     if (e->button() == Qt::LeftButton && Rotating)
     {
-        // TODO-DG: If movement is insignificant, ray trace for point to select.
-        DoRotate(e->pos(), lastMousePoint);
-        Rotating = false;
+        float x = initialMousePoint.x() - e->pos().x();
+        float y = initialMousePoint.y() - e->pos().y();
+        float pointDistanceSquared = x*x + y*y;
+        if (pointDistanceSquared > MIN_MOUSE_MOVE) {
+            DoRotate(e->pos(), lastMousePoint);
+            Rotating = false;
+        } else {
+            // TODO-DG: If movement is insignificant, ray trace for point to select.
+        }
+
     }
 
     if (e->button() == Qt::RightButton && Scaling)
     {
-        // TODO-DG: If movement is insignificant, ray trace for point to delete.
-        DoScale(e->pos(), lastMousePoint);
-        Scaling = false;
+        float x = initialMousePoint.x() - e->pos().x();
+        float y = initialMousePoint.y() - e->pos().y();
+        float pointDistanceSquared = x*x + y*y;
+        if (pointDistanceSquared > MIN_MOUSE_MOVE) {
+            DoScale(e->pos(), lastMousePoint);
+            Scaling = false;
+        } else {
+            // TODO-DG: If movement is insignificant, ray trace for point to delete.
+            Vector3d cameraRayStart;
+            Vector3d cameraRayDirection;
+            calculateMouseRay(cameraRayStart, cameraRayDirection, e->pos().x(), e->pos().y());
+        }
     }
 
     updateGL();

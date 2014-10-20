@@ -63,6 +63,7 @@ private:
 
     Vector3d CameraPos;
     QPoint lastMousePoint;
+    QPoint initialMousePoint;
 
 
     QVector<Vector3d> pointList;
