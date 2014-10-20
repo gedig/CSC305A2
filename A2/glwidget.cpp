@@ -16,7 +16,7 @@ const double RadPerPixel = - 0.01;
 const double MovePerPixel = - 0.1;
 const float DEG2RAD = 3.14159/180;
 
-Vector3d convertWindowToWorld(float x, float y, float z)
+QVector3D convertWindowToWorld(float x, float y, float z)
 {
     GLint viewport[4];
     GLdouble modelview[16];
@@ -34,23 +34,14 @@ Vector3d convertWindowToWorld(float x, float y, float z)
 
     gluUnProject(winX, winY, winZ, modelview, projection, viewport, &worldX, &worldY, &worldZ);
 
-    Vector3d worldPoint;
-    worldPoint.x = worldX;
-    worldPoint.y = worldY;
-    worldPoint.z = worldZ;
+    QVector3D worldPoint(worldX, worldY, worldZ);
     return worldPoint;
 }
 
-void calculateMouseRay(Vector3d &startingPoint, Vector3d &direction, int mouseX, int mouseY)
+void calculateMouseRay(QVector3D &startingPoint, QVector3D &direction, int mouseX, int mouseY)
 {
-    Vector3d tempVector = convertWindowToWorld(mouseX, mouseY, 0.0);
-    startingPoint.x = tempVector.x;
-    startingPoint.y = tempVector.y;
-    startingPoint.z = tempVector.z;
-    tempVector = convertWindowToWorld(mouseX, mouseY, 1.0);
-    direction.x = tempVector.x;
-    direction.y = tempVector.y;
-    direction.z = tempVector.z;
+    startingPoint = convertWindowToWorld(mouseX, mouseY, 0.0);
+    direction = convertWindowToWorld(mouseX, mouseY, 1.0);
 }
 
 GLWidget::GLWidget(QWidget *parent)
@@ -146,7 +137,7 @@ void GLWidget::paintGL()
     // TODO-DG: Turn this line into a catmull spline
     for (int i = 0; i < pointList.size(); i++) {
         glPushMatrix();
-        glTranslatef(pointList[i].x, pointList[i].y, pointList[i].z);
+        glTranslatef(pointList[i].x(), pointList[i].y(), pointList[i].z());
         GLUquadric* quad = gluNewQuadric();
         gluSphere(quad, GLdouble(POINT_RADIUS), GLint(30), GLint(30));
         glPopMatrix(); // Applies the transform to the sphere without affecting the lines.
@@ -154,8 +145,8 @@ void GLWidget::paintGL()
         // TODO-DG: Don't draw a line between the points, draw the catmull spline.
         if (i > 0) {
             glBegin(GL_LINES);
-            glVertex3f(pointList[i-1].x, pointList[i-1].y, pointList[i-1].z);
-            glVertex3f(pointList[i].x, pointList[i].y, pointList[i].z);
+            glVertex3f(pointList[i-1].x(), pointList[i-1].y(), pointList[i-1].z());
+            glVertex3f(pointList[i].x(), pointList[i].y(), pointList[i].z());
             glEnd();
         }
     }
@@ -231,8 +222,8 @@ void GLWidget::mousePressEvent( QMouseEvent *e )
         Scaling = true;
     } else if (e->button() == Qt::MiddleButton) {
         //Create a point when middle mouse button is clicked
-        Vector3d mVector = convertWindowToWorld( e->pos().x(), e->pos().y(), 0.1);
-        if (mVector.y >= 0) {
+        QVector3D mVector = convertWindowToWorld( e->pos().x(), e->pos().y(), 0.1);
+        if (mVector.y() >= 0) {
             pointList.push_back(mVector);
         }
     }
@@ -266,8 +257,8 @@ void GLWidget::mouseReleaseEvent( QMouseEvent *e)
             Scaling = false;
         } else {
             // TODO-DG: If movement is insignificant, ray trace for point to delete.
-            Vector3d cameraRayStart;
-            Vector3d cameraRayDirection;
+            QVector3D cameraRayStart;
+            QVector3D cameraRayDirection;
             calculateMouseRay(cameraRayStart, cameraRayDirection, e->pos().x(), e->pos().y());
         }
     }

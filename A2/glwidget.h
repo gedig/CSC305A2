@@ -66,7 +66,7 @@ private:
     QPoint initialMousePoint;
 
 
-    QVector<Vector3d> pointList;
+    QVector<QVector3D> pointList;
 
     bool Rotating;
     bool Scaling;
