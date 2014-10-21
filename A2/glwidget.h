@@ -33,6 +33,7 @@ public:
     void clear();
     void help();
     void clearPoints();
+    void togglePoints();
 
 protected:
     //Initialize the OpenGL Graphics Engine
@@ -45,9 +46,9 @@ protected:
     //its attached GLWidget
     void resizeGL(int width, int height);
     //Handle mouse
-        void mousePressEvent(QMouseEvent *event);
-        void mouseReleaseEvent(QMouseEvent *event);
-        void mouseMoveEvent(QMouseEvent *event);
+    void mousePressEvent(QMouseEvent *event);
+    void mouseReleaseEvent(QMouseEvent *event);
+    void mouseMoveEvent(QMouseEvent *event);
 
 private:
     void startup();
@@ -72,6 +73,7 @@ private:
     QVector<QVector3D> pointList;
 
     bool Rotating;
+    bool displayPoints;
     enum Dragging { NONE, X, Y, Z };
     Dragging dragAxis;
     bool Scaling;

@@ -39,6 +39,7 @@ void GLWidget::startup()
     version=MYVERSION;
     CameraPos.x = CameraPos.y = CameraPos.z = 5;
     Rotating = false;
+    displayPoints = true;
     dragAxis = NONE;
     Scaling = false;
     selectedPoint = -1;
@@ -107,16 +108,21 @@ void GLWidget::paintGL()
     glVertex3f(0.0f, 100.0f, 0.0f);
     glEnd();
 
-    // Draws circles at every point, with catmull splines where they can be computed.
-    for (int i = 0; i < pointList.size(); i++) {
-        glColor3f(0.0, 0.6, 0.0);
-        glPushMatrix();
-        glTranslatef(pointList[i].x(), pointList[i].y(), pointList[i].z());
-        GLUquadric* quad = gluNewQuadric();
-        gluSphere(quad, GLdouble(POINT_RADIUS), GLint(30), GLint(30));
-        glPopMatrix(); // Applies the transform to the sphere without affecting the lines.
 
+    for (int i = 0; i < pointList.size(); i++) {
+        GLUquadric* quad = gluNewQuadric();
+        if (displayPoints) {
+            // Draws spheres to represent points, with catmull splines where they can be computed.
+            glColor3f(0.0, 0.6, 0.0);
+            glPushMatrix();
+            glTranslatef(pointList[i].x(), pointList[i].y(), pointList[i].z());
+            gluSphere(quad, GLdouble(POINT_RADIUS), GLint(30), GLint(30));
+            glPopMatrix(); // Applies the transform to the sphere without affecting the lines.
+        }
+
+        // This section draws the "handles" for selected points
         if (i == selectedPoint) {
+            // Lines to denote axis of movement.
             glLineWidth(POINT_HANDLE_WIDTH);
             glColor3f(0.0, 0.0, 1.0);
             glBegin(GL_LINES);
@@ -128,6 +134,7 @@ void GLWidget::paintGL()
             glVertex3f(pointList[i].x(), pointList[i].y(), pointList[i].z() + POINT_HANDLE_LENGTH);
             glEnd();
 
+            // Spheres at the end of the handles
             glPushMatrix();
             glTranslatef(pointList[i].x() + POINT_RADIUS*2, pointList[i].y(), pointList[i].z());
             gluSphere(quad, GLdouble(POINT_RADIUS/2), GLint(30), GLint(30));
@@ -142,6 +149,7 @@ void GLWidget::paintGL()
             glPopMatrix();
         }
 
+        // Set colour for the spline line
         glColor3f(0.0, 1.0, 0.0);
         glLineWidth(3);
         // draw the catmull spline between the points
@@ -154,6 +162,7 @@ void GLWidget::paintGL()
                 QVector3D p2 = pointList[i-1];
                 QVector3D p3 = pointList[i];
 
+                // Algorithm to calculate the point on the catmull rom spline
                 QVector3D nextPoint = 0.5 * ((2*p1) + (p0*(-1) + p2)*t + (2*p0 - 5*p1 + 4*p2 - p3)*t*t + (p0*(-1) + 3*p1 - 3*p2 + p3)*t*t*t);
                 glBegin(GL_LINES);
                 glVertex3f(prevPoint.x(), prevPoint.y(), prevPoint.z());
@@ -191,6 +200,13 @@ void GLWidget::clearPoints()
     selectedPoint = -1;
     pointList.clear();
     clear();
+}
+
+void GLWidget::togglePoints()
+{
+    selectedPoint = -1;
+    displayPoints = !displayPoints;
+    updateGL();
 }
 
 
@@ -351,7 +367,8 @@ void GLWidget::mouseReleaseEvent( QMouseEvent *e)
             Rotating = false;
         } else if (pointDistanceSquared < MIN_MOUSE_MOVE) {
             // If movement is insignificant, ray trace for point to select.
-            selectedPoint = nearestPointToRay(e->pos().x(), e->pos().y());
+            if (displayPoints)
+                selectedPoint = nearestPointToRay(e->pos().x(), e->pos().y());
         }
         dragAxis = NONE;
     }
