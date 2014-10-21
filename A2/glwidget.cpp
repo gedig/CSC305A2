@@ -368,10 +368,10 @@ void GLWidget::mouseMoveEvent( QMouseEvent *e )
     {
         if (Rotating) {
             DoRotate(e->pos(), lastMousePoint);
-            lastMousePoint = e->pos();
         } else if (dragAxis != NONE && selectedPoint != -1) {
             DoDrag(e->pos(), lastMousePoint);
         }
+        lastMousePoint = e->pos();
     }
 
     if ((e->buttons() & Qt::RightButton) && Scaling)
@@ -438,19 +438,25 @@ void GLWidget::DoScale(QPoint desc, QPoint orig)
 // Moves pointList[selectedPoint] by desc.axis - orig.axis in whichever axis is selected.
 void GLWidget::DoDrag(QPoint desc, QPoint orig)
 {
-    float xDist = desc.x() - orig.x();
-//    float distance = (desc.x()-orig.x())*(desc.x()-orig.x()) + (desc.y()-orig.y())*(desc.y()-orig.y());
-//    distance /= 1000.0f;
+    //float xDist = desc.x() - orig.x();
+    // Need to get distance to the point
+    QVector3D newPosition = convertWindowToWorld(desc.x(), desc.y(), 0.1);
+    QVector3D prevPosition = convertWindowToWorld(orig.x(), orig.y(), 0.1);
+    QVector3D distance = newPosition - prevPosition;
+    distance *= 1.5;
     switch (dragAxis) {
         case X:
             //pointList[selectedPoint] = QVector3D(pointToMoveTo.x(), pointList[selectedPoint].y(), pointList[selectedPoint].z());
-        pointList[selectedPoint] += QVector3D(xDist * .001, 0, 0);
+        pointList[selectedPoint] += QVector3D(distance.x(), 0, 0);
+        break;
         case Y:
             //pointList[selectedPoint] = QVector3D(pointList[selectedPoint].x(), pointToMoveTo.x(), pointList[selectedPoint].z());
-            pointList[selectedPoint] += QVector3D(0, xDist * .001, 0);
+            pointList[selectedPoint] += QVector3D(0, distance.y(), 0);
+            break;
         case Z:
             //pointList[selectedPoint] = QVector3D(pointToMoveTo.x(), pointList[selectedPoint].y(), pointList[selectedPoint].z());
-            pointList[selectedPoint] += QVector3D(0, 0, xDist * .001);
+            pointList[selectedPoint] += QVector3D(0, 0, distance.z());
+            break;
         default:
             break;
     }
