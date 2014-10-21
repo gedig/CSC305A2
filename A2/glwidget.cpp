@@ -14,6 +14,8 @@
 #define MIN_MOUSE_MOVE 16
 #define POINT_HANDLE_LENGTH 0.2
 #define POINT_HANDLE_WIDTH 5
+#define CATMULL_FIDELITY 20
+
 const double RadPerPixel = - 0.01;
 const double MovePerPixel = - 0.1;
 
@@ -107,6 +109,7 @@ void GLWidget::paintGL()
 
     // Draws circles at every point, with catmull splines where they can be computed.
     for (int i = 0; i < pointList.size(); i++) {
+        glColor3f(0.0, 0.6, 0.0);
         glPushMatrix();
         glTranslatef(pointList[i].x(), pointList[i].y(), pointList[i].z());
         GLUquadric* quad = gluNewQuadric();
@@ -117,11 +120,11 @@ void GLWidget::paintGL()
             glLineWidth(POINT_HANDLE_WIDTH);
             glColor3f(0.0, 0.0, 1.0);
             glBegin(GL_LINES);
-            glVertex3f(pointList[i].x(), pointList[i].y(), pointList[i].z());
+            glVertex3f(pointList[i].x() + POINT_RADIUS, pointList[i].y(), pointList[i].z());
             glVertex3f(pointList[i].x() + POINT_HANDLE_LENGTH, pointList[i].y(), pointList[i].z());
-            glVertex3f(pointList[i].x(), pointList[i].y(), pointList[i].z());
+            glVertex3f(pointList[i].x(), pointList[i].y() + POINT_RADIUS, pointList[i].z());
             glVertex3f(pointList[i].x(), pointList[i].y() + POINT_HANDLE_LENGTH, pointList[i].z());
-            glVertex3f(pointList[i].x(), pointList[i].y(), pointList[i].z());
+            glVertex3f(pointList[i].x(), pointList[i].y(), pointList[i].z() + POINT_RADIUS);
             glVertex3f(pointList[i].x(), pointList[i].y(), pointList[i].z() + POINT_HANDLE_LENGTH);
             glEnd();
 
@@ -137,16 +140,27 @@ void GLWidget::paintGL()
             glTranslatef(pointList[i].x(), pointList[i].y(), pointList[i].z() + POINT_RADIUS*2);
             gluSphere(quad, GLdouble(POINT_RADIUS/2), GLint(30), GLint(30));
             glPopMatrix();
-            glColor3f(0.0, 1.0, 0.0);
-            glLineWidth(3);
         }
 
-        // TODO-DG: Don't draw a line between the points, draw the catmull spline.
-        if (i > 0) {
-            glBegin(GL_LINES);
-            glVertex3f(pointList[i-1].x(), pointList[i-1].y(), pointList[i-1].z());
-            glVertex3f(pointList[i].x(), pointList[i].y(), pointList[i].z());
-            glEnd();
+        glColor3f(0.0, 1.0, 0.0);
+        glLineWidth(3);
+        // draw the catmull spline between the points
+        if (i > 2) {
+            QVector3D prevPoint = pointList[i-2];
+            for (int j = 0; j <= CATMULL_FIDELITY; j++) {
+                float t = (float)j/CATMULL_FIDELITY;
+                QVector3D p0 = pointList[i-3];
+                QVector3D p1 = pointList[i-2];
+                QVector3D p2 = pointList[i-1];
+                QVector3D p3 = pointList[i];
+
+                QVector3D nextPoint = 0.5 * ((2*p1) + (p0*(-1) + p2)*t + (2*p0 - 5*p1 + 4*p2 - p3)*t*t + (p0*(-1) + 3*p1 - 3*p2 + p3)*t*t*t);
+                glBegin(GL_LINES);
+                glVertex3f(prevPoint.x(), prevPoint.y(), prevPoint.z());
+                glVertex3f(nextPoint.x(), nextPoint.y(), nextPoint.z());
+                glEnd();
+                prevPoint = nextPoint;
+            }
         }
     }
 }
@@ -166,9 +180,9 @@ void GLWidget::help()
     QString helpString;
     QString title="Application Help";
 
-    helpString = "Controls: \nLeft mouse button rotates the camera and selects points.";
-    helpString += "\nRight mouse button controls zoom and deletes points.";
-    helpString += "\nMiddle mouse button adds points.";
+    helpString = "Controls:\n\nLeft mouse button rotates the camera, selects points, and moves points.";
+    helpString += "\n\nRight mouse button controls zoom and deletes points.";
+    helpString += "\n\nMiddle mouse button adds points.";
     QMessageBox::information( this, title, helpString, QMessageBox::Ok );
 }
 
@@ -438,23 +452,22 @@ void GLWidget::DoScale(QPoint desc, QPoint orig)
 // Moves pointList[selectedPoint] by desc.axis - orig.axis in whichever axis is selected.
 void GLWidget::DoDrag(QPoint desc, QPoint orig)
 {
-    //float xDist = desc.x() - orig.x();
     // Need to get distance to the point
     QVector3D newPosition = convertWindowToWorld(desc.x(), desc.y(), 0.1);
     QVector3D prevPosition = convertWindowToWorld(orig.x(), orig.y(), 0.1);
     QVector3D distance = newPosition - prevPosition;
     distance *= 1.5;
+
     switch (dragAxis) {
         case X:
-            //pointList[selectedPoint] = QVector3D(pointToMoveTo.x(), pointList[selectedPoint].y(), pointList[selectedPoint].z());
-        pointList[selectedPoint] += QVector3D(distance.x(), 0, 0);
-        break;
+            pointList[selectedPoint] += QVector3D(distance.x(), 0, 0);
+            break;
         case Y:
-            //pointList[selectedPoint] = QVector3D(pointList[selectedPoint].x(), pointToMoveTo.x(), pointList[selectedPoint].z());
             pointList[selectedPoint] += QVector3D(0, distance.y(), 0);
+            if (pointList[selectedPoint].y() < POINT_RADIUS)
+                pointList[selectedPoint].setY(POINT_RADIUS);
             break;
         case Z:
-            //pointList[selectedPoint] = QVector3D(pointToMoveTo.x(), pointList[selectedPoint].y(), pointList[selectedPoint].z());
             pointList[selectedPoint] += QVector3D(0, 0, distance.z());
             break;
         default:
