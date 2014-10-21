@@ -8,12 +8,11 @@
 #define GLWIDGET_H
 
 #include <QGLWidget>
-#include <QProgressBar>
+//#include <QProgressBar>
 #include "foundation.h"
 #include <QtGui>
 #include <QtOpenGL>
 #include <glu.h>
-#include "version.h"
 
 
 const int maxw=1024;
@@ -34,7 +33,7 @@ public:
     void help();
     void clearPoints();
     void togglePoints();
-    void toggleOrtho();
+    void toggleOrtho(int index);
 
 protected:
     //Initialize the OpenGL Graphics Engine
@@ -54,7 +53,6 @@ protected:
 private:
     void startup();
     int winw, winh, button,imx,imy;
-    int version;
     void dopan(int x, int y, bool click);
     void zoomWheel(int z);
     void displayImage();
@@ -73,7 +71,8 @@ private:
 
     QVector<QVector3D> pointList;
 
-    bool perspective;
+    enum Perspective { P, XPOS, XNEG, ZPOS, ZNEG };
+    Perspective currentPerspective;
     bool Rotating;
     bool displayPoints;
     enum Dragging { NONE, X, Y, Z };

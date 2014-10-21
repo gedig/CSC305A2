@@ -43,11 +43,6 @@ void Window::helpBut()
     m_glWidget->help();
 }
 
-void Window::on_pushButton_clicked()
-{
-    m_glWidget->toggleOrtho();
-}
-
 void Window::on_pushButton_2_clicked()
 {
     m_glWidget->clearPoints();
@@ -56,4 +51,9 @@ void Window::on_pushButton_2_clicked()
 void Window::on_pushButton_3_clicked()
 {
     m_glWidget->togglePoints();
+}
+
+void Window::on_viewSelect_activated(int index)
+{
+    m_glWidget->toggleOrtho(index);
 }

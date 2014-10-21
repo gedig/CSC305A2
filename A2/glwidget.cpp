@@ -21,7 +21,6 @@ const double MovePerPixel = - 0.1;
 
 GLWidget::GLWidget(QWidget *parent)
     : QGLWidget(parent),
-      perspective(true),
       displayPoints(true)
 {
     startup();
@@ -38,10 +37,10 @@ void GLWidget::startup()
     winh=height();
     button = 0;
     cerr << "Glwidget\n";
-    version=MYVERSION;
     CameraPos.x = CameraPos.y = CameraPos.z = 5;
     Rotating = false;
     dragAxis = NONE;
+    currentPerspective = P;
     Scaling = false;
     selectedPoint = -1;
 }
@@ -70,15 +69,37 @@ void GLWidget::paintGL()
 {
     glClear( GL_COLOR_BUFFER_BIT );
 
-    if (perspective) {
-        //gluPerspective();
-    } else {
-        //gluOrtho2D();
-    }
     glLoadIdentity();
-    gluLookAt(CameraPos.x,
-              CameraPos.y,
-              CameraPos.z, 0, 0, 0, 0.0, 1.0, 0.0);
+    switch (currentPerspective) {
+        case P:
+        gluLookAt(CameraPos.x,CameraPos.y, CameraPos.z, // Eye
+                  0, 0, 0, // Center
+                  0.0, 1.0, 0.0); // Up
+        break;
+    case XPOS:
+        gluLookAt(3, 1, 0, // Eye
+                  0, 1, 0, // Center
+                  0.0, 1.0, 0.0); // Up
+        break;
+    case XNEG:
+        gluLookAt(-3, 1, 0, // Eye
+                  0, 1, 0, // Center
+                  0.0, 1.0, 0.0); // Up
+        break;
+    case ZPOS:
+        gluLookAt(0, 1, 3, // Eye
+                  0, 1, 0, // Center
+                  0.0, 1.0, 0.0); // Up
+        break;
+    case ZNEG:
+        gluLookAt(0, 1, -3, // Eye
+                  0, 1, 0, // Center
+                  0.0, 1.0, 0.0); // Up
+        break;
+    default:
+        qDebug() << "We should never get here, using this in lieu of assert";
+        exit(1);
+    }
 
     // Draws the xz plane
     glBegin(GL_QUADS);
@@ -183,6 +204,7 @@ void GLWidget::paintGL()
 /* 2D */
 void GLWidget::resizeGL( int w, int h )
 {
+    currentPerspective = P;
     glViewport( 0, 0, (GLint)w, (GLint)h );
     glMatrixMode( GL_PROJECTION );
     glLoadIdentity();
@@ -215,9 +237,38 @@ void GLWidget::togglePoints()
     updateGL();
 }
 
-void GLWidget::toggleOrtho()
+void GLWidget::toggleOrtho(int index)
 {
-    perspective = !perspective;
+    glMatrixMode( GL_PROJECTION );
+    glLoadIdentity();
+    switch (index) {
+    case 0:
+        qDebug() << "Perspec";
+        currentPerspective = P;
+        glFrustum( -1.0, 1.0, -1.0, 1.0, 5.0, 1500.0 );
+        break;
+    case 1:
+        qDebug() << "Xpos";
+        currentPerspective = XPOS;
+        break;
+    case 2:
+        qDebug() << "Xneg";
+        currentPerspective = XNEG;
+        break;
+    case 3:
+        qDebug() << "Zpos";
+        currentPerspective = ZPOS;
+        break;
+    case 4:
+        qDebug() << "Zneg";
+        currentPerspective = ZNEG;
+        break;
+    }
+
+    if (index > 0) {
+        glFrustum( -1.0, 1.0, -1.0, 1.0, 5.0, 1500.0 );
+    }
+    glMatrixMode( GL_MODELVIEW );
     updateGL();
 }
 
@@ -349,7 +400,7 @@ void GLWidget::mousePressEvent( QMouseEvent *e )
                 }
             }
         }
-        if (dragAxis == NONE) {
+        if (dragAxis == NONE && currentPerspective == P) {
             Rotating = true;
         }
         lastMousePoint = e->pos();
@@ -357,7 +408,8 @@ void GLWidget::mousePressEvent( QMouseEvent *e )
     } else if (e->button() == Qt::RightButton) {
         lastMousePoint = e->pos();
         initialMousePoint = e->pos();
-        Scaling = true;
+        if (currentPerspective == P)
+            Scaling = true;
     } else if (e->button() == Qt::MiddleButton) {
         //Create a point when middle mouse button is clicked
         QVector3D mVector = convertWindowToWorld( e->pos().x(), e->pos().y(), 0.1);
@@ -376,7 +428,7 @@ void GLWidget::mouseReleaseEvent( QMouseEvent *e)
         float x = initialMousePoint.x() - e->pos().x();
         float y = initialMousePoint.y() - e->pos().y();
         float pointDistanceSquared = x*x + y*y;
-        if (pointDistanceSquared > MIN_MOUSE_MOVE && Rotating) {
+        if (pointDistanceSquared > MIN_MOUSE_MOVE && Rotating && currentPerspective == P) {
             DoRotate(e->pos(), lastMousePoint);
             Rotating = false;
         } else if (pointDistanceSquared < MIN_MOUSE_MOVE) {
@@ -387,7 +439,7 @@ void GLWidget::mouseReleaseEvent( QMouseEvent *e)
         dragAxis = NONE;
     }
 
-    if (e->button() == Qt::RightButton && Scaling)
+    if (e->button() == Qt::RightButton && Scaling && currentPerspective == P)
     {
         float x = initialMousePoint.x() - e->pos().x();
         float y = initialMousePoint.y() - e->pos().y();

@@ -16,3 +16,9 @@ Clicking and holding the right mouse button allows you to zoom.
 Clicking a point with the right mouse button deletes the point.
 
 The middle mouse button is used to create points.
+
+
+Data Structures used:
+The only significant data structure used in this assignment is a QVector of QVector3Ds.
+The algorithms of note are the catmull rom algorithm, the ray picking used to select points,
+and the mapping from window coordinates to world coordinates, which is performed mostly through OpenGL functions.

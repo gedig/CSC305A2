@@ -32,11 +32,11 @@ private:
         void clear();
         void helpBut();
 
-        void on_pushButton_clicked();
-
         void on_pushButton_2_clicked();
 
         void on_pushButton_3_clicked();
+
+        void on_viewSelect_activated(int index);
 
 protected:
          void  resizeEvent(QResizeEvent * );
