@@ -77,13 +77,13 @@ void GLWidget::paintGL()
                   0.0, 1.0, 0.0); // Up
         break;
     case XPOS:
-        gluLookAt(3, 1, 0, // Eye
-                  0, 1, 0, // Center
+        gluLookAt(3, 0, 0, // Eye
+                  0, 0, 0, // Center
                   0.0, 1.0, 0.0); // Up
         break;
     case XNEG:
-        gluLookAt(-3, 1, 0, // Eye
-                  0, 1, 0, // Center
+        gluLookAt(-3, 0, 0, // Eye
+                  0, 0, 0, // Center
                   0.0, 1.0, 0.0); // Up
         break;
     case ZPOS:
@@ -266,7 +266,7 @@ void GLWidget::toggleOrtho(int index)
     }
 
     if (index > 0) {
-        glOrtho(-1.0f, 1.0f, -1.0f, 1.0f, -5.0f, 100.0f);
+        glOrtho(-1.0f, 1.0f, -1.0f, 1.0f, 5.0f, 100.0f);
     }
     glMatrixMode( GL_MODELVIEW );
     updateGL();
