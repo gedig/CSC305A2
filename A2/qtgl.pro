@@ -10,8 +10,7 @@ INCLUDEPATH += .
 # Input
 HEADERS += glwidget.h \
     window.h \
-    foundation.h \
-    version.h
+    foundation.h
 FORMS += MainWindow.ui
 SOURCES += glwidget.cpp \
     main.cpp \

@@ -20,7 +20,9 @@ const double RadPerPixel = - 0.01;
 const double MovePerPixel = - 0.1;
 
 GLWidget::GLWidget(QWidget *parent)
-    : QGLWidget(parent)
+    : QGLWidget(parent),
+      perspective(true),
+      displayPoints(true)
 {
     startup();
 }
@@ -39,7 +41,6 @@ void GLWidget::startup()
     version=MYVERSION;
     CameraPos.x = CameraPos.y = CameraPos.z = 5;
     Rotating = false;
-    displayPoints = true;
     dragAxis = NONE;
     Scaling = false;
     selectedPoint = -1;
@@ -69,6 +70,11 @@ void GLWidget::paintGL()
 {
     glClear( GL_COLOR_BUFFER_BIT );
 
+    if (perspective) {
+        //gluPerspective();
+    } else {
+        //gluOrtho2D();
+    }
     glLoadIdentity();
     gluLookAt(CameraPos.x,
               CameraPos.y,
@@ -209,6 +215,12 @@ void GLWidget::togglePoints()
     updateGL();
 }
 
+void GLWidget::toggleOrtho()
+{
+    perspective = !perspective;
+    updateGL();
+}
+
 
 void GLWidget::initLight()
 {
@@ -260,6 +272,8 @@ QVector3D GLWidget::convertWindowToWorld(float x, float y, float z)
     return QVector3D(worldX, worldY, worldZ);
 }
 
+// This function tests a ray against the objects in pointList and returns the index
+// of the closest intersecting point.
 int GLWidget::nearestPointToRay(int mouseX, int mouseY) {
     int nearestPoint = -1;
     float smallestT = -1;

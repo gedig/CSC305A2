@@ -45,8 +45,7 @@ void Window::helpBut()
 
 void Window::on_pushButton_clicked()
 {
-    // TODO-DG: Switch view between orthographic and perspective.
-    qDebug() << "clicked";
+    m_glWidget->toggleOrtho();
 }
 
 void Window::on_pushButton_2_clicked()

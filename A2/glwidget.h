@@ -34,6 +34,7 @@ public:
     void help();
     void clearPoints();
     void togglePoints();
+    void toggleOrtho();
 
 protected:
     //Initialize the OpenGL Graphics Engine
@@ -72,6 +73,7 @@ private:
 
     QVector<QVector3D> pointList;
 
+    bool perspective;
     bool Rotating;
     bool displayPoints;
     enum Dragging { NONE, X, Y, Z };
