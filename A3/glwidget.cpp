@@ -46,6 +46,15 @@ void GLWidget::startup()
     selectedPoint = -1;
 }
 
+QVector3D GLWidget::matMult(QVector3D vec, float mat[3][3])
+{
+    QVector3D temp;
+    temp.setX(vec.x() * mat[0][0] + vec.y() * mat[1][0] + vec.z() * mat[2][0]);
+    temp.setY(vec.x() * mat[0][1] + vec.y() * mat[1][1] + vec.z() * mat[2][1]);
+    temp.setZ(vec.x() * mat[0][2] + vec.y() * mat[1][2] + vec.z() * mat[2][2]);
+    return temp;
+}
+
 void GLWidget::clear()
 {
      updateGL();
@@ -142,6 +151,7 @@ void GLWidget::paintGL()
     glEnd();
 
 
+    QVector3D Bpast;
     for (int i = 0; i < pointList.size(); i++) {
         GLUquadric* quad = gluNewQuadric();
         if (displayPoints) {
@@ -188,12 +198,48 @@ void GLWidget::paintGL()
         // draw the catmull spline between the points
         if (i > 2) {
             QVector3D prevPoint = pointList[i-2];
+            QVector3D p0 = pointList[i-3];
+            QVector3D p1 = pointList[i-2];
+            QVector3D p2 = pointList[i-1];
+            QVector3D p3 = pointList[i];
+
+            QVector3D P, V, Q;
+            QVector3D T, N, B;
+            if (i == 3) { // Very first frame on the catmull rom spline, this is where we define the base frenet frame
+                P = p1;
+                V = 0.5 * (-1*p0 + p2);
+                Q = 2*p0 - 5*p1 + 4*p2 - p3;
+
+                T = V.normalized();
+                N = V.crossProduct(V, V.crossProduct(Q,V));
+                N.normalize();
+                B = B.crossProduct(T,N);
+
+                // TODO-DG: Testing code to draw a square aligned to the base frenet frame, remove
+                // TODO-DG: Move this code so that frames are drawn along the line
+                float matrix[3][3];
+                matrix[0][0] = N.x();
+                matrix[0][1] = N.y();
+                matrix[0][2] = N.z();
+                matrix[1][0] = B.x();
+                matrix[1][1] = B.y();
+                matrix[1][2] = B.z();
+                matrix[2][0] = P.x();
+                matrix[2][1] = P.y();
+                matrix[2][2] = P.z();
+                QVector3D c0 = matMult(QVector3D(-0.3,-0.3, 1), matrix);
+                QVector3D c1 = matMult(QVector3D(-0.3, 0.3, 1), matrix);
+                QVector3D c2 = matMult(QVector3D(0.3, 0.3, 1), matrix);
+                QVector3D c3 = matMult(QVector3D(0.3, -0.3, 1), matrix);
+                glBegin(GL_QUADS);
+                glVertex3f(c0.x(), c0.y(), c0.z());
+                glVertex3f(c1.x(), c1.y(), c1.z());
+                glVertex3f(c2.x(), c2.y(), c2.z());
+                glVertex3f(c3.x(), c3.y(), c3.z());
+                glEnd();
+            }
             for (int j = 0; j <= CATMULL_FIDELITY; j++) {
                 float t = (float)j/CATMULL_FIDELITY;
-                QVector3D p0 = pointList[i-3];
-                QVector3D p1 = pointList[i-2];
-                QVector3D p2 = pointList[i-1];
-                QVector3D p3 = pointList[i];
 
                 // Algorithm to calculate the point on the catmull rom spline
                 QVector3D nextPoint = 0.5 * ((2*p1) + (p0*(-1) + p2)*t + (2*p0 - 5*p1 + 4*p2 - p3)*t*t + (p0*(-1) + 3*p1 - 3*p2 + p3)*t*t*t);
@@ -201,7 +247,6 @@ void GLWidget::paintGL()
                 glVertex3f(prevPoint.x(), prevPoint.y(), prevPoint.z());
                 glVertex3f(nextPoint.x(), nextPoint.y(), nextPoint.z());
                 glEnd();
-                // TODO-DG: Draw a circle at 'next point' so that the face of the circle points towards the tangent (derivative of the above equation).
 
                 prevPoint = nextPoint;
             }
@@ -216,7 +261,7 @@ void GLWidget::paintGL()
         // TODO-DG: Get rotation of Cube via frenet calculations
         cubePos = pointList[1];
         glTranslatef(cubePos.x(), cubePos.y(), cubePos.z());
-        glScalef(0.5f, 0.5f, 0.5f);
+        glScalef(0.4f, 0.4f, 0.4f);
         drawCube();
         glPopMatrix(); // Applies the transform to the sphere without affecting the lines.
 

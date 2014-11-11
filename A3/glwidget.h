@@ -53,6 +53,7 @@ protected:
 
 private:
     void startup();
+    QVector3D matMult(QVector3D vec, float mat[3][3]);
     int winw, winh, button,imx,imy;
     void dopan(int x, int y, bool click);
     void zoomWheel(int z);
