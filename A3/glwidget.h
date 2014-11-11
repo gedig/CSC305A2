@@ -34,6 +34,7 @@ public:
     void clearPoints();
     void togglePoints();
     void toggleOrtho(int index);
+    void toggleAnim();
 
 protected:
     //Initialize the OpenGL Graphics Engine
@@ -56,6 +57,7 @@ private:
     void dopan(int x, int y, bool click);
     void zoomWheel(int z);
     void displayImage();
+    void drawCube();
 
     // Functions
     void redraw();
@@ -70,6 +72,8 @@ private:
 
 
     QVector<QVector3D> pointList;
+    QVector3D cubePos;
+    bool cubeOn;
 
     enum Perspective { P, XPOS, XNEG, ZPOS, ZNEG };
     Perspective currentPerspective;

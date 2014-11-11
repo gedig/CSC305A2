@@ -38,6 +38,8 @@ private:
 
         void on_viewSelect_activated(int index);
 
+        void on_pushButton_clicked();
+
 protected:
          void  resizeEvent(QResizeEvent * );
 

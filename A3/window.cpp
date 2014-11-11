@@ -57,3 +57,8 @@ void Window::on_viewSelect_activated(int index)
 {
     m_glWidget->toggleOrtho(index);
 }
+
+void Window::on_pushButton_clicked()
+{
+    m_glWidget->toggleAnim();
+}

@@ -21,6 +21,7 @@ const double MovePerPixel = - 0.1;
 
 GLWidget::GLWidget(QWidget *parent)
     : QGLWidget(parent),
+      cubeOn(false),
       displayPoints(true)
 {
     startup();
@@ -57,6 +58,7 @@ void GLWidget::initializeGL()
     // Set up various other stuff
     glClearColor( 0.1, 0.1, 0.1, 0.0 ); // Let OpenGL clear to black
     glEnable( GL_CULL_FACE );  	// don't need Z testing for convex objects
+    glEnable( GL_DEPTH_TEST );
     glHint( GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST );
 }
 
@@ -67,7 +69,7 @@ void GLWidget::redraw()
 
 void GLWidget::paintGL()
 {
-    glClear( GL_COLOR_BUFFER_BIT );
+    glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glLoadIdentity();
     switch (currentPerspective) {
@@ -77,13 +79,13 @@ void GLWidget::paintGL()
                   0.0, 1.0, 0.0); // Up
         break;
     case XPOS:
-        gluLookAt(3, 0, 0, // Eye
-                  0, 0, 0, // Center
+        gluLookAt(3, 1, 0, // Eye
+                  0, 1, 0, // Center
                   0.0, 1.0, 0.0); // Up
         break;
     case XNEG:
-        gluLookAt(-3, 0, 0, // Eye
-                  0, 0, 0, // Center
+        gluLookAt(-3, 1, 0, // Eye
+                  0, 1, 0, // Center
                   0.0, 1.0, 0.0); // Up
         break;
     case ZPOS:
@@ -104,32 +106,36 @@ void GLWidget::paintGL()
     // Draws the xz plane
     glBegin(GL_QUADS);
     glColor3f(0.6, 0.6, 1.0);
-    glVertex3f( -PLANE_SIZE, 0, -PLANE_SIZE);
-    glVertex3f( -PLANE_SIZE, 0, PLANE_SIZE);
-    glVertex3f( PLANE_SIZE, 0, PLANE_SIZE);
-    glVertex3f( PLANE_SIZE, 0, -PLANE_SIZE);
+    glVertex3f( -PLANE_SIZE, -0.1, -PLANE_SIZE);
+    glVertex3f( -PLANE_SIZE, -0.1, PLANE_SIZE);
+    glVertex3f( PLANE_SIZE, -0.1, PLANE_SIZE);
+    glVertex3f( PLANE_SIZE, -0.1, -PLANE_SIZE);
     glEnd();
 
     // Draws the grid on the xz plane.
+    glColor3f(.2, .2, .2);
     glBegin(GL_LINES);
     for(int i = -PLANE_SIZE; i <= PLANE_SIZE; i += GRID_DISTANCE) {
-        glColor3f(.2, .2, .2);
-        glVertex3f(i,0,-PLANE_SIZE);
-        glVertex3f(i,0,PLANE_SIZE);
-        glVertex3f(-PLANE_SIZE,0,i);
-        glVertex3f(PLANE_SIZE,0,i);
+        if (i == 0) {
+            glColor3f(1.0, 0, 0);
+            glVertex3f(i,0,-PLANE_SIZE);
+            glVertex3f(i,0,PLANE_SIZE);
+            glColor3f(0, 0, 1.0);
+            glVertex3f(-PLANE_SIZE,0,i);
+            glVertex3f(PLANE_SIZE,0,i);
+            glColor3f(.2, .2, .2);
+        } else {
+            glVertex3f(i,0,-PLANE_SIZE);
+            glVertex3f(i,0,PLANE_SIZE);
+            glVertex3f(-PLANE_SIZE,0,i);
+            glVertex3f(PLANE_SIZE,0,i);
+        }
     };
     glEnd();
 
     // Draws the axis lines
     glLineWidth(3);
-    glColor3f(1.0, 0.0, 0.0);
     glBegin(GL_LINES);
-    glVertex3f(-100.0, 0.0, 0.0);
-    glVertex3f(100, 0, 0);
-    glColor3f(0.0, 0.0, 1.0);
-    glVertex3f(0.0, 0.0, -100.0);
-    glVertex3f(0, 0, 100.0f);
     glColor3f(0.0, 1.0, 0.0);
     glVertex3f(0.0, 0.0, 0.0);
     glVertex3f(0.0f, 100.0f, 0.0f);
@@ -195,10 +201,61 @@ void GLWidget::paintGL()
                 glVertex3f(prevPoint.x(), prevPoint.y(), prevPoint.z());
                 glVertex3f(nextPoint.x(), nextPoint.y(), nextPoint.z());
                 glEnd();
+                // TODO-DG: Draw a circle at 'next point' so that the face of the circle points towards the tangent (derivative of the above equation).
+
                 prevPoint = nextPoint;
             }
         }
     }
+
+    // Draw the cube if there are enough points for a catmull rom spline and the cube is on.
+    if (pointList.size() > 2 && cubeOn) {
+        glColor3f(1.0, 0.6, 1.0);
+        glPushMatrix();
+        // TODO-DG: Properly update the cube pos depending on current animation.
+        // TODO-DG: Get rotation of Cube via frenet calculations
+        cubePos = pointList[1];
+        glTranslatef(cubePos.x(), cubePos.y(), cubePos.z());
+        glScalef(0.5f, 0.5f, 0.5f);
+        drawCube();
+        glPopMatrix(); // Applies the transform to the sphere without affecting the lines.
+
+    }
+}
+
+void GLWidget::drawCube()
+{
+    glBegin(GL_QUADS);
+    glVertex3f( 0.5f, 0.5f,-0.5f);    // Top Right Of The Quad (Top)
+    glVertex3f(-0.5f, 0.5f,-0.5f);    // Top Left Of The Quad (Top)
+    glVertex3f(-0.5f, 0.5f, 0.5f);    // Bottom Left Of The Quad (Top)
+    glVertex3f( 0.5f, 0.5f, 0.5f);    // Bottom Right Of The Quad (Top)
+
+    glVertex3f( 0.5f,-0.5f, 0.5f);    // Top Right Of The Quad (Bottom)
+    glVertex3f(-0.5f,-0.5f, 0.5f);    // Top Left Of The Quad (Bottom)
+    glVertex3f(-0.5f,-0.5f,-0.5f);    // Bottom Left Of The Quad (Bottom)
+    glVertex3f( 0.5f,-0.5f,-0.5f);    // Bottom Right Of The Quad (Bottom)
+
+    glVertex3f( 0.5f, 0.5f, 0.5f);    // Top Right Of The Quad (Front)
+    glVertex3f(-0.5f, 0.5f, 0.5f);    // Top Left Of The Quad (Front)
+    glVertex3f(-0.5f,-0.5f, 0.5f);    // Bottom Left Of The Quad (Front)
+    glVertex3f( 0.5f,-0.5f, 0.5f);    // Bottom Right Of The Quad (Front)
+
+    glVertex3f( 0.5f,-0.5f,-0.5f);    // Top Right Of The Quad (Back)
+    glVertex3f(-0.5f,-0.5f,-0.5f);    // Top Left Of The Quad (Back)
+    glVertex3f(-0.5f, 0.5f,-0.5f);    // Bottom Left Of The Quad (Back)
+    glVertex3f( 0.5f, 0.5f,-0.5f);    // Bottom Right Of The Quad (Back)
+
+    glVertex3f(-0.5f, 0.5f, 0.5f);    // Top Right Of The Quad (Left)
+    glVertex3f(-0.5f, 0.5f,-0.5f);    // Top Left Of The Quad (Left)
+    glVertex3f(-0.5f,-0.5f,-0.5f);    // Bottom Left Of The Quad (Left)
+    glVertex3f(-0.5f,-0.5f, 0.5f);    // Bottom Right Of The Quad (Left)
+
+    glVertex3f( 0.5f, 0.5f,-0.5f);    // Top Right Of The Quad (Right)
+    glVertex3f( 0.5f, 0.5f, 0.5f);    // Top Left Of The Quad (Right)
+    glVertex3f( 0.5f,-0.5f, 0.5f);    // Bottom Left Of The Quad (Right)
+    glVertex3f( 0.5f,-0.5f,-0.5f);    // Bottom Right Of The Quad (Right) - See more at: http://www.codemiles.com/c-opengl-examples/draw-3d-cube-using-opengl-t9018.html#sthash.DpmpkUoa.dpuf
+    glEnd();
 }
 
 /* 2D */
@@ -266,9 +323,14 @@ void GLWidget::toggleOrtho(int index)
     }
 
     if (index > 0) {
-        glOrtho(-1.0f, 1.0f, -1.0f, 1.0f, 5.0f, 100.0f);
+        glOrtho(-1.0f, 1.0f, -1.0f, 1.0f, -5.0f, 100.0f);
     }
     glMatrixMode( GL_MODELVIEW );
+    updateGL();
+}
+void GLWidget::toggleAnim()
+{
+    cubeOn = !cubeOn;
     updateGL();
 }
 
@@ -329,7 +391,7 @@ int GLWidget::nearestPointToRay(int mouseX, int mouseY) {
     int nearestPoint = -1;
     float smallestT = -1;
     for (int i = 0; i < pointList.size(); i++) {
-        QVector3D cameraRayStart = convertWindowToWorld(mouseX, mouseY, 0.0);
+        QVector3D cameraRayStart = convertWindowToWorld(mouseX, mouseY, -0.1);
         QVector3D cameraRayDirection = convertWindowToWorld(mouseX, mouseY, 1.0);
 
         QVector3D rayOriginMinusSphereCenter = cameraRayStart - pointList[i];
@@ -433,8 +495,10 @@ void GLWidget::mouseReleaseEvent( QMouseEvent *e)
             Rotating = false;
         } else if (pointDistanceSquared < MIN_MOUSE_MOVE) {
             // If movement is insignificant, ray trace for point to select.
-            if (displayPoints)
+            if (displayPoints) {
                 selectedPoint = nearestPointToRay(e->pos().x(), e->pos().y());
+                Rotating = false;
+            }
         }
         dragAxis = NONE;
     }
