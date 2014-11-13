@@ -37,6 +37,7 @@ public:
     void toggleAnim();
     void playPauseAnim();
     void toggleCylinder();
+    void changeCylinderShape(int shape);
 
 protected:
     //Initialize the OpenGL Graphics Engine
@@ -55,13 +56,14 @@ protected:
 
 private:
     void startup();
-    QVector3D matMult(QVector3D vec, float mat[3][3]);
+    QVector3D crossSectionToWorld(QVector3D vec, float mat[3][3]);
     int winw, winh, button,imx,imy;
     void dopan(int x, int y, bool click);
     void zoomWheel(int z);
     void displayImage();
     void drawCube(bool changeColours);
-    void drawFrenetFrame(QVector3D N, QVector3D B, QVector3D P);
+    void drawEndFrames(bool first, QVector3D N, QVector3D B, QVector3D P);
+    void drawFrenetFrame(QVector3D prevN, QVector3D prevB, QVector3D prevP, QVector3D N, QVector3D B, QVector3D P, int frame);
 
     // Functions
     void redraw();
@@ -76,9 +78,12 @@ private:
 
 
     QVector<QVector3D> pointList;
+    QVector<QVector3D> crossSectionCoords;
 
     enum Perspective { P, XPOS, XNEG, ZPOS, ZNEG };
     Perspective currentPerspective;
+    enum CylinderShape { SQUARE, CIRCLE, STAR, LINE, CUSTOM };
+    CylinderShape currentCylinderShape;
     bool Rotating;
     bool displayPoints;
     enum Dragging { NONE, X, Y, Z };

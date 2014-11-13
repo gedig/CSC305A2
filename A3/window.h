@@ -44,6 +44,8 @@ private:
 
         void on_toggleCylinderButton_clicked();
 
+        void on_cylinderShapeSelect_currentIndexChanged(int index);
+
 protected:
          void  resizeEvent(QResizeEvent * );
 

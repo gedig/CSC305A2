@@ -72,3 +72,8 @@ void Window::on_toggleCylinderButton_clicked()
 {
     m_glWidget->toggleCylinder();
 }
+
+void Window::on_cylinderShapeSelect_currentIndexChanged(int index)
+{
+    m_glWidget->changeCylinderShape(index);
+}

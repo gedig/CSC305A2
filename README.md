@@ -17,8 +17,18 @@ Clicking a point with the right mouse button deletes the point.
 
 The middle mouse button is used to create points.
 
+The animation control buttons allow you to toggle whether or not the animation is active,
+and allow you to pause the animation.
+
+The dropdown for cylinder shape allows you to choose which shape is drawn along the frenet frames.
+
 
 Data Structures used:
-The only significant data structure used in this assignment is a QVector of QVector3Ds.
+The only significant data structure used in this assignment are QVectors of QVector3Ds.
+Specifically, the QVector containing my cross-section co-ordinates is interesting because
+it contains QVector3Ds but refers to 2D points in the cross-section. The z-value on these
+points refers to whether or not there is a line drawn between the previous point or not. 
+This allows for complex shapes.
+
 The algorithms of note are the catmull rom algorithm, the ray picking used to select points,
 and the mapping from window coordinates to world coordinates, which is performed mostly through OpenGL functions.

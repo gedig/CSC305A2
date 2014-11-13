@@ -15,6 +15,7 @@
 #define POINT_HANDLE_LENGTH 0.2
 #define POINT_HANDLE_WIDTH 5
 #define CATMULL_FIDELITY 25
+#define CIRCLE_QUALITY 20
 
 const double RadPerPixel = - 0.01;
 const double MovePerPixel = - 0.1;
@@ -45,6 +46,8 @@ void GLWidget::startup()
     Rotating = false;
     dragAxis = NONE;
     currentPerspective = P;
+    currentCylinderShape = SQUARE;
+    changeCylinderShape(SQUARE);
     Scaling = false;
     selectedPoint = -1;
 
@@ -53,12 +56,12 @@ void GLWidget::startup()
     // animTimer is started when the animation is started.
 }
 
-QVector3D GLWidget::matMult(QVector3D vec, float mat[3][3])
-{
+QVector3D GLWidget::crossSectionToWorld(QVector3D vec, float mat[3][3])
+{   
     QVector3D temp;
-    temp.setX(vec.x() * mat[0][0] + vec.y() * mat[1][0] + vec.z() * mat[2][0]);
-    temp.setY(vec.x() * mat[0][1] + vec.y() * mat[1][1] + vec.z() * mat[2][1]);
-    temp.setZ(vec.x() * mat[0][2] + vec.y() * mat[1][2] + vec.z() * mat[2][2]);
+    temp.setX(vec.x() * mat[0][0] + vec.y() * mat[1][0] + mat[2][0]);
+    temp.setY(vec.x() * mat[0][1] + vec.y() * mat[1][1] + mat[2][1]);
+    temp.setZ(vec.x() * mat[0][2] + vec.y() * mat[1][2] + mat[2][2]);
     return temp;
 }
 
@@ -158,8 +161,9 @@ void GLWidget::paintGL()
     glEnd();
 
 
-    QVector3D Bpast;
+    QVector3D prevN, prevB, prevP;
     int currentFrame = 0;
+    totalFrames = 0;
     for (int i = 0; i < pointList.size(); i++) {
         GLUquadric* quad = gluNewQuadric();
         if (displayPoints) {
@@ -221,11 +225,13 @@ void GLWidget::paintGL()
                 T = V.normalized();
                 N = V.crossProduct(V, V.crossProduct(Q,V)).normalized();
                 B = B.crossProduct(T,N).normalized();
-                if (i == 3)
-                    Bpast = B;
-
-                if (displayCylinder)
-                    drawFrenetFrame(N, B, P);
+                if (displayCylinder) {
+                    glColor3f(0.0, 0.8, 0.2);
+                    drawEndFrames(true, N, B, P);
+                }
+                prevN = N;
+                prevB = B;
+                prevP = P;
             }
             for (int j = 0; j <= CATMULL_FIDELITY; j++) {
                 currentFrame++;
@@ -239,20 +245,23 @@ void GLWidget::paintGL()
                 Q = 0.5 * (6*t*((-1)*p0 + 3*p1 - 3*p2 + p3) + 2*(2*p0-5*p1 + 4*p2 - p3));
 
                 T = V.normalized();
-                N = N.crossProduct(T,Bpast).normalized();
+                N = N.crossProduct(T,prevB).normalized();
                 B = B.crossProduct(T,N).normalized();
 
-                if (displayCylinder)
-                    drawFrenetFrame(N,B,P);
+                //if (displayCylinder && j == CATMULL_FIDELITY) {
+                if (displayCylinder) {
+                    glColor3f(0.0, 0.8, 0.2);
+                    drawFrenetFrame(prevN, prevB, prevP, N, B, P, currentFrame);
+                }
 
                 if (cubeOn && currentFrame == currentCubeFrame) {
                     // Draw the cube
                     glPushMatrix();
                     // Get rotation of Cube via frenet calculations
-                    float cubeRotationDegree = T.dotProduct(QVector3D(1, 0, 0), T);
+                    float cubeRotationDegree = T.dotProduct(QVector3D(1, 0, 0), T); //Angle of rotation is arccos(objectXAxis.T)
                     cubeRotationDegree = qAcos(cubeRotationDegree);
-                    cubeRotationDegree *= 57.29578f;
-                    QVector3D cubeRotationAxis = T.crossProduct(QVector3D(1, 0, 0), T);
+                    cubeRotationDegree *= 57.29578f; // Convert from radians to degrees
+                    QVector3D cubeRotationAxis = T.crossProduct(QVector3D(1, 0, 0), T); // Rotation axis is objectXAxis crossproduct T
                     glTranslatef(P.x(), P.y(), P.z());
                     glScalef(0.3f, 0.3f, 0.3f);
                     glRotatef(cubeRotationDegree, cubeRotationAxis.x(), cubeRotationAxis.y(), cubeRotationAxis.z());
@@ -261,13 +270,15 @@ void GLWidget::paintGL()
                     glColor3f(0.0, 1.0, 0.0);
                 }
 
-                Bpast = B;
-
+                glColor3f(0.0, 1.0, 0.0);
                 glBegin(GL_LINES);
                 glVertex3f(prevPoint.x(), prevPoint.y(), prevPoint.z());
                 glVertex3f(nextPoint.x(), nextPoint.y(), nextPoint.z());
                 glEnd();
 
+                prevN = N;
+                prevB = B;
+                prevP = P;
                 prevPoint = nextPoint;
             }
         }
@@ -286,6 +297,8 @@ void GLWidget::drawCube(bool changeColours)
     glVertex3f(-0.5f, 0.5f,-0.5f);    // Top Left Of The Quad (Top)
     glVertex3f(-0.5f, 0.5f, 0.5f);    // Bottom Left Of The Quad (Top)
     glVertex3f( 0.5f, 0.5f, 0.5f);    // Bottom Right Of The Quad (Top)
+    if (changeColours)
+        glColor3f(1.0, 1.0, 0.0);
 
     glVertex3f( 0.5f,-0.5f, 0.5f);    // Top Right Of The Quad (Bottom)
     glVertex3f(-0.5f,-0.5f, 0.5f);    // Top Left Of The Quad (Bottom)
@@ -298,6 +311,8 @@ void GLWidget::drawCube(bool changeColours)
     glVertex3f(-0.5f, 0.5f, 0.5f);    // Top Left Of The Quad (Front)
     glVertex3f(-0.5f,-0.5f, 0.5f);    // Bottom Left Of The Quad (Front)
     glVertex3f( 0.5f,-0.5f, 0.5f);    // Bottom Right Of The Quad (Front)
+    if (changeColours)
+        glColor3f(1.0, 0.0, 0.0);
 
     glVertex3f( 0.5f,-0.5f,-0.5f);    // Top Right Of The Quad (Back)
     glVertex3f(-0.5f,-0.5f,-0.5f);    // Top Left Of The Quad (Back)
@@ -318,8 +333,9 @@ void GLWidget::drawCube(bool changeColours)
     glEnd();
 }
 
-void GLWidget::drawFrenetFrame(QVector3D N, QVector3D B, QVector3D P)
+void GLWidget::drawEndFrames(bool first, QVector3D N, QVector3D B, QVector3D P)
 {
+    // If not first frame, draw quads between this frame and the previous frame
     float matrix[3][3];
     matrix[0][0] = N.x();
     matrix[0][1] = N.y();
@@ -331,18 +347,74 @@ void GLWidget::drawFrenetFrame(QVector3D N, QVector3D B, QVector3D P)
     matrix[2][1] = P.y();
     matrix[2][2] = P.z();
 
-    // TODO-DG: Allow for various shapes in here and find a way to connect them with a generalized cylinder.
-    QVector3D c0 = matMult(QVector3D(-0.3,-0.3, 1), matrix);
-    QVector3D c1 = matMult(QVector3D(-0.3, 0.3, 1), matrix);
-    QVector3D c2 = matMult(QVector3D(0.3, 0.3, 1), matrix);
-    QVector3D c3 = matMult(QVector3D(0.3, -0.3, 1), matrix);
+    // TODO-DG: Draw the shape in 2D here including fill.
+//    QVector3D c0 = crossSectionToWorld(crossSectionCoords[0], matrix);
+//    QVector3D c1 = crossSectionToWorld(crossSectionCoords[1], matrix);
+//    QVector3D c2 = crossSectionToWorld(crossSectionCoords[2], matrix);
+//    QVector3D c3 = crossSectionToWorld(crossSectionCoords[3], matrix);
 
-    glBegin(GL_QUADS);
-    glVertex3f(c0.x(), c0.y(), c0.z());
-    glVertex3f(c1.x(), c1.y(), c1.z());
-    glVertex3f(c2.x(), c2.y(), c2.z());
-    glVertex3f(c3.x(), c3.y(), c3.z());
-    glEnd();
+//    glBegin(GL_QUADS);
+//    glVertex3f(c0.x(), c0.y(), c0.z());
+//    glVertex3f(c1.x(), c1.y(), c1.z());
+//    glVertex3f(c2.x(), c2.y(), c2.z());
+//    glVertex3f(c3.x(), c3.y(), c3.z());
+//    glEnd();
+}
+
+void GLWidget::drawFrenetFrame(QVector3D prevN, QVector3D prevB, QVector3D prevP, QVector3D N, QVector3D B, QVector3D P, int frame)
+{
+    // draw quads between this frame and the previous frame
+    float prevMatrix[3][3];
+    prevMatrix[0][0] = prevN.x();
+    prevMatrix[0][1] = prevN.y();
+    prevMatrix[0][2] = prevN.z();
+    prevMatrix[1][0] = prevB.x();
+    prevMatrix[1][1] = prevB.y();
+    prevMatrix[1][2] = prevB.z();
+    prevMatrix[2][0] = prevP.x();
+    prevMatrix[2][1] = prevP.y();
+    prevMatrix[2][2] = prevP.z();
+    float matrix[3][3];
+    matrix[0][0] = N.x();
+    matrix[0][1] = N.y();
+    matrix[0][2] = N.z();
+    matrix[1][0] = B.x();
+    matrix[1][1] = B.y();
+    matrix[1][2] = B.z();
+    matrix[2][0] = P.x();
+    matrix[2][1] = P.y();
+    matrix[2][2] = P.z();
+
+    // DRAW QUADS BETWEEN PREVIOUS 2D POINTS AND THESE 2D POINTS FOR EACH LINE IN THE 2D DIAGRAM
+    for (int i = 0; i < crossSectionCoords.size(); i++) {
+        QVector3D currentPoint = crossSectionCoords[i];
+        QVector3D p0, p1, p2, p3;
+        if (currentPoint.z() != 0) {
+            QVector3D prevPoint = crossSectionCoords[(i+crossSectionCoords.size()-1)%crossSectionCoords.size()];
+            if (frame % 2 != 0) {
+                p0 = crossSectionToWorld(prevPoint, prevMatrix);
+                 p1 = crossSectionToWorld(currentPoint, prevMatrix);
+                 p2 = crossSectionToWorld(-1*currentPoint, matrix);
+                 p3 = crossSectionToWorld(-1*prevPoint, matrix);
+            } else {
+                p0 = crossSectionToWorld(-1*prevPoint, prevMatrix);
+                p1 = crossSectionToWorld(-1*currentPoint, prevMatrix);
+                p2 = crossSectionToWorld(currentPoint, matrix);
+                p3 = crossSectionToWorld(prevPoint, matrix);
+            }
+
+            glBegin(GL_QUADS);
+            glVertex3f(p0.x(), p0.y(), p0.z());
+            glVertex3f(p1.x(), p1.y(), p1.z());
+            glVertex3f(p2.x(), p2.y(), p2.z());
+            glVertex3f(p3.x(), p3.y(), p3.z());
+            glVertex3f(p3.x(), p3.y(), p3.z());
+            glVertex3f(p2.x(), p2.y(), p2.z());
+            glVertex3f(p1.x(), p1.y(), p1.z());
+            glVertex3f(p0.x(), p0.y(), p0.z());
+            glEnd();
+        }
+    }
 }
 
 /* 2D */
@@ -387,24 +459,19 @@ void GLWidget::toggleOrtho(int index)
     glLoadIdentity();
     switch (index) {
     case 0:
-        qDebug() << "Perspec";
         currentPerspective = P;
         glFrustum( -1.0, 1.0, -1.0, 1.0, 5.0, 1500.0 );
         break;
     case 1:
-        qDebug() << "Xpos";
         currentPerspective = XPOS;
         break;
     case 2:
-        qDebug() << "Xneg";
         currentPerspective = XNEG;
         break;
     case 3:
-        qDebug() << "Zpos";
         currentPerspective = ZPOS;
         break;
     case 4:
-        qDebug() << "Zneg";
         currentPerspective = ZNEG;
         break;
     }
@@ -442,6 +509,48 @@ void GLWidget::playPauseAnim()
 void GLWidget::toggleCylinder()
 {
     displayCylinder = !displayCylinder;
+    updateGL();
+}
+
+void GLWidget::changeCylinderShape(int shape)
+{
+    crossSectionCoords.clear();
+    float PI2 = 6.283185;
+    switch(shape) {
+    case SQUARE:
+        crossSectionCoords.append(QVector3D(-0.3f,-0.3f, 1));
+        crossSectionCoords.append(QVector3D(-0.3f, 0.3f, 1));
+        crossSectionCoords.append(QVector3D(0.3f, 0.3f, 1));
+        crossSectionCoords.append(QVector3D(0.3f, -0.3f, 1));
+        break;
+    case CIRCLE:
+        for ( int i = CIRCLE_QUALITY; i > 0; i--) {
+            float radiusStep = (float)i / (float)CIRCLE_QUALITY;
+            float x = 0.42 * cos(PI2 * radiusStep);
+            float y = 0.42 * sin(PI2 * radiusStep);
+            crossSectionCoords.append(QVector3D(x, y, 1));
+        }
+        break;
+    case STAR:
+        crossSectionCoords.append(QVector3D(0, 0.42f, 1));
+        crossSectionCoords.append(QVector3D(0.1f, 0.1f, 1));
+        crossSectionCoords.append(QVector3D(0.4f, 0.1f, 1));
+        crossSectionCoords.append(QVector3D(0.2f, -0.1f, 1));
+        crossSectionCoords.append(QVector3D(0.3f, -0.4f, 1));
+        crossSectionCoords.append(QVector3D(0, -0.2f, 1));
+        crossSectionCoords.append(QVector3D(-0.3f, -0.4f, 1));
+        crossSectionCoords.append(QVector3D(-0.2f, -0.1f, 1));
+        crossSectionCoords.append(QVector3D(-0.4f, 0.1f, 1));
+        crossSectionCoords.append(QVector3D(-0.1f, 0.1f, 1));
+        break;
+    case LINE:
+        crossSectionCoords.append(QVector3D(0, 0.42f, 1));
+        crossSectionCoords.append(QVector3D(0.0f, 0.1f, 1));
+        break;
+    case CUSTOM:
+        // TODO-DG: Pop up a window and allow the user to draw shapes to it.
+        break;
+    }
     updateGL();
 }
 
