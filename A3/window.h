@@ -40,6 +40,10 @@ private:
 
         void on_pushButton_clicked();
 
+        void on_playButton_clicked();
+
+        void on_toggleCylinderButton_clicked();
+
 protected:
          void  resizeEvent(QResizeEvent * );
 

@@ -62,3 +62,13 @@ void Window::on_pushButton_clicked()
 {
     m_glWidget->toggleAnim();
 }
+
+void Window::on_playButton_clicked()
+{
+    m_glWidget->playPauseAnim();
+}
+
+void Window::on_toggleCylinderButton_clicked()
+{
+    m_glWidget->toggleCylinder();
+}

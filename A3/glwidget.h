@@ -35,6 +35,8 @@ public:
     void togglePoints();
     void toggleOrtho(int index);
     void toggleAnim();
+    void playPauseAnim();
+    void toggleCylinder();
 
 protected:
     //Initialize the OpenGL Graphics Engine
@@ -58,7 +60,8 @@ private:
     void dopan(int x, int y, bool click);
     void zoomWheel(int z);
     void displayImage();
-    void drawCube();
+    void drawCube(bool changeColours);
+    void drawFrenetFrame(QVector3D N, QVector3D B, QVector3D P);
 
     // Functions
     void redraw();
@@ -73,8 +76,6 @@ private:
 
 
     QVector<QVector3D> pointList;
-    QVector3D cubePos;
-    bool cubeOn;
 
     enum Perspective { P, XPOS, XNEG, ZPOS, ZNEG };
     Perspective currentPerspective;
@@ -88,6 +89,18 @@ private:
     void DoRotate(QPoint desc, QPoint orig);
     void DoScale(QPoint desc, QPoint orig);
     void DoDrag(QPoint desc, QPoint orig);
+
+    bool displayCylinder;
+
+    QTimer *animTimer;
+    bool cubeOn;
+    bool animPlay;
+    int currentCubeFrame;
+    int totalFrames;
+
+private slots:
+    void incrementCubePos();
+
 };
 
 

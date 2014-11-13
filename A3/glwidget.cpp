@@ -14,15 +14,18 @@
 #define MIN_MOUSE_MOVE 16
 #define POINT_HANDLE_LENGTH 0.2
 #define POINT_HANDLE_WIDTH 5
-#define CATMULL_FIDELITY 20
+#define CATMULL_FIDELITY 25
 
 const double RadPerPixel = - 0.01;
 const double MovePerPixel = - 0.1;
 
 GLWidget::GLWidget(QWidget *parent)
     : QGLWidget(parent),
+      displayPoints(true),
+      displayCylinder(true),
       cubeOn(false),
-      displayPoints(true)
+      animPlay(true),
+      currentCubeFrame(0)
 {
     startup();
 }
@@ -44,6 +47,10 @@ void GLWidget::startup()
     currentPerspective = P;
     Scaling = false;
     selectedPoint = -1;
+
+    animTimer = new QTimer(this);
+    connect(animTimer, SIGNAL(timeout()), this, SLOT(incrementCubePos()));
+    // animTimer is started when the animation is started.
 }
 
 QVector3D GLWidget::matMult(QVector3D vec, float mat[3][3])
@@ -152,6 +159,7 @@ void GLWidget::paintGL()
 
 
     QVector3D Bpast;
+    int currentFrame = 0;
     for (int i = 0; i < pointList.size(); i++) {
         GLUquadric* quad = gluNewQuadric();
         if (displayPoints) {
@@ -211,38 +219,50 @@ void GLWidget::paintGL()
                 Q = 2*p0 - 5*p1 + 4*p2 - p3;
 
                 T = V.normalized();
-                N = V.crossProduct(V, V.crossProduct(Q,V));
-                N.normalize();
-                B = B.crossProduct(T,N);
+                N = V.crossProduct(V, V.crossProduct(Q,V)).normalized();
+                B = B.crossProduct(T,N).normalized();
+                if (i == 3)
+                    Bpast = B;
 
-                // TODO-DG: Testing code to draw a square aligned to the base frenet frame, remove
-                // TODO-DG: Move this code so that frames are drawn along the line
-                float matrix[3][3];
-                matrix[0][0] = N.x();
-                matrix[0][1] = N.y();
-                matrix[0][2] = N.z();
-                matrix[1][0] = B.x();
-                matrix[1][1] = B.y();
-                matrix[1][2] = B.z();
-                matrix[2][0] = P.x();
-                matrix[2][1] = P.y();
-                matrix[2][2] = P.z();
-                QVector3D c0 = matMult(QVector3D(-0.3,-0.3, 1), matrix);
-                QVector3D c1 = matMult(QVector3D(-0.3, 0.3, 1), matrix);
-                QVector3D c2 = matMult(QVector3D(0.3, 0.3, 1), matrix);
-                QVector3D c3 = matMult(QVector3D(0.3, -0.3, 1), matrix);
-                glBegin(GL_QUADS);
-                glVertex3f(c0.x(), c0.y(), c0.z());
-                glVertex3f(c1.x(), c1.y(), c1.z());
-                glVertex3f(c2.x(), c2.y(), c2.z());
-                glVertex3f(c3.x(), c3.y(), c3.z());
-                glEnd();
+                if (displayCylinder)
+                    drawFrenetFrame(N, B, P);
             }
             for (int j = 0; j <= CATMULL_FIDELITY; j++) {
+                currentFrame++;
                 float t = (float)j/CATMULL_FIDELITY;
 
                 // Algorithm to calculate the point on the catmull rom spline
                 QVector3D nextPoint = 0.5 * ((2*p1) + (p0*(-1) + p2)*t + (2*p0 - 5*p1 + 4*p2 - p3)*t*t + (p0*(-1) + 3*p1 - 3*p2 + p3)*t*t*t);
+
+                P = nextPoint;
+                V = 0.5 * (3*t*t*((-1)*p0 + 3*p1 - 3*p2 + p3) +2*t*(2*p0-5*p1 + 4*p2 - p3) + ((-1)*p0 + p2));
+                Q = 0.5 * (6*t*((-1)*p0 + 3*p1 - 3*p2 + p3) + 2*(2*p0-5*p1 + 4*p2 - p3));
+
+                T = V.normalized();
+                N = N.crossProduct(T,Bpast).normalized();
+                B = B.crossProduct(T,N).normalized();
+
+                if (displayCylinder)
+                    drawFrenetFrame(N,B,P);
+
+                if (cubeOn && currentFrame == currentCubeFrame) {
+                    // Draw the cube
+                    glPushMatrix();
+                    // Get rotation of Cube via frenet calculations
+                    float cubeRotationDegree = T.dotProduct(QVector3D(1, 0, 0), T);
+                    cubeRotationDegree = qAcos(cubeRotationDegree);
+                    cubeRotationDegree *= 57.29578f;
+                    QVector3D cubeRotationAxis = T.crossProduct(QVector3D(1, 0, 0), T);
+                    glTranslatef(P.x(), P.y(), P.z());
+                    glScalef(0.3f, 0.3f, 0.3f);
+                    glRotatef(cubeRotationDegree, cubeRotationAxis.x(), cubeRotationAxis.y(), cubeRotationAxis.z());
+                    drawCube(true);
+                    glPopMatrix(); // Applies the transform to the sphere without affecting the lines.
+                    glColor3f(0.0, 1.0, 0.0);
+                }
+
+                Bpast = B;
+
                 glBegin(GL_LINES);
                 glVertex3f(prevPoint.x(), prevPoint.y(), prevPoint.z());
                 glVertex3f(nextPoint.x(), nextPoint.y(), nextPoint.z());
@@ -252,25 +272,16 @@ void GLWidget::paintGL()
             }
         }
     }
-
-    // Draw the cube if there are enough points for a catmull rom spline and the cube is on.
-    if (pointList.size() > 2 && cubeOn) {
-        glColor3f(1.0, 0.6, 1.0);
-        glPushMatrix();
-        // TODO-DG: Properly update the cube pos depending on current animation.
-        // TODO-DG: Get rotation of Cube via frenet calculations
-        cubePos = pointList[1];
-        glTranslatef(cubePos.x(), cubePos.y(), cubePos.z());
-        glScalef(0.4f, 0.4f, 0.4f);
-        drawCube();
-        glPopMatrix(); // Applies the transform to the sphere without affecting the lines.
-
-    }
+    totalFrames = currentFrame;
 }
 
-void GLWidget::drawCube()
+/* Draws a cube with sides of size 1 with center at 0,0,0.
+    if changeColours is true, then the cube will have different colours on all sides.*/
+void GLWidget::drawCube(bool changeColours)
 {
     glBegin(GL_QUADS);
+    if (changeColours)
+        glColor3f(1.0, 0.6, 1.0);
     glVertex3f( 0.5f, 0.5f,-0.5f);    // Top Right Of The Quad (Top)
     glVertex3f(-0.5f, 0.5f,-0.5f);    // Top Left Of The Quad (Top)
     glVertex3f(-0.5f, 0.5f, 0.5f);    // Bottom Left Of The Quad (Top)
@@ -280,6 +291,8 @@ void GLWidget::drawCube()
     glVertex3f(-0.5f,-0.5f, 0.5f);    // Top Left Of The Quad (Bottom)
     glVertex3f(-0.5f,-0.5f,-0.5f);    // Bottom Left Of The Quad (Bottom)
     glVertex3f( 0.5f,-0.5f,-0.5f);    // Bottom Right Of The Quad (Bottom)
+    if (changeColours)
+        glColor3f(1.0, 0.5, 0.0);
 
     glVertex3f( 0.5f, 0.5f, 0.5f);    // Top Right Of The Quad (Front)
     glVertex3f(-0.5f, 0.5f, 0.5f);    // Top Left Of The Quad (Front)
@@ -290,6 +303,8 @@ void GLWidget::drawCube()
     glVertex3f(-0.5f,-0.5f,-0.5f);    // Top Left Of The Quad (Back)
     glVertex3f(-0.5f, 0.5f,-0.5f);    // Bottom Left Of The Quad (Back)
     glVertex3f( 0.5f, 0.5f,-0.5f);    // Bottom Right Of The Quad (Back)
+    if (changeColours)
+        glColor3f(0.0, 0.0, 1.0);
 
     glVertex3f(-0.5f, 0.5f, 0.5f);    // Top Right Of The Quad (Left)
     glVertex3f(-0.5f, 0.5f,-0.5f);    // Top Left Of The Quad (Left)
@@ -300,6 +315,33 @@ void GLWidget::drawCube()
     glVertex3f( 0.5f, 0.5f, 0.5f);    // Top Left Of The Quad (Right)
     glVertex3f( 0.5f,-0.5f, 0.5f);    // Bottom Left Of The Quad (Right)
     glVertex3f( 0.5f,-0.5f,-0.5f);    // Bottom Right Of The Quad (Right) - See more at: http://www.codemiles.com/c-opengl-examples/draw-3d-cube-using-opengl-t9018.html#sthash.DpmpkUoa.dpuf
+    glEnd();
+}
+
+void GLWidget::drawFrenetFrame(QVector3D N, QVector3D B, QVector3D P)
+{
+    float matrix[3][3];
+    matrix[0][0] = N.x();
+    matrix[0][1] = N.y();
+    matrix[0][2] = N.z();
+    matrix[1][0] = B.x();
+    matrix[1][1] = B.y();
+    matrix[1][2] = B.z();
+    matrix[2][0] = P.x();
+    matrix[2][1] = P.y();
+    matrix[2][2] = P.z();
+
+    // TODO-DG: Allow for various shapes in here and find a way to connect them with a generalized cylinder.
+    QVector3D c0 = matMult(QVector3D(-0.3,-0.3, 1), matrix);
+    QVector3D c1 = matMult(QVector3D(-0.3, 0.3, 1), matrix);
+    QVector3D c2 = matMult(QVector3D(0.3, 0.3, 1), matrix);
+    QVector3D c3 = matMult(QVector3D(0.3, -0.3, 1), matrix);
+
+    glBegin(GL_QUADS);
+    glVertex3f(c0.x(), c0.y(), c0.z());
+    glVertex3f(c1.x(), c1.y(), c1.z());
+    glVertex3f(c2.x(), c2.y(), c2.z());
+    glVertex3f(c3.x(), c3.y(), c3.z());
     glEnd();
 }
 
@@ -375,7 +417,31 @@ void GLWidget::toggleOrtho(int index)
 }
 void GLWidget::toggleAnim()
 {
-    cubeOn = !cubeOn;
+    if (cubeOn) {
+        animTimer->stop();
+        cubeOn = false;
+    } else {
+        cubeOn = true;
+        if (animPlay)
+            animTimer->start(100);
+    }
+    updateGL();
+}
+
+void GLWidget::playPauseAnim()
+{
+    if (animPlay) {
+        animPlay = false;
+        animTimer->stop();
+    } else {
+        animPlay = true;
+        animTimer->start(100);
+    }
+}
+
+void GLWidget::toggleCylinder()
+{
+    displayCylinder = !displayCylinder;
     updateGL();
 }
 
@@ -665,4 +731,13 @@ void GLWidget::DoDrag(QPoint desc, QPoint orig)
         default:
             break;
     }
+}
+
+void GLWidget::incrementCubePos()
+{
+    currentCubeFrame++;
+    if (currentCubeFrame > totalFrames)
+        currentCubeFrame = 0;
+
+    updateGL();
 }
