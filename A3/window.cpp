@@ -19,6 +19,8 @@ Window::Window(QWidget *parent):QDialog(parent)
 {
     //We create an instance of GLWidget component we built in glwidget.h
     m_glWidget = new GLWidget;
+    m_drawWidget = new BasicOpenGLView;
+    m_drawWidget->mainWidget = m_glWidget;
 
     //Setup application interface. Creates all the required components and sliders.
     setupUi(this);
@@ -75,5 +77,12 @@ void Window::on_toggleCylinderButton_clicked()
 
 void Window::on_cylinderShapeSelect_currentIndexChanged(int index)
 {
+    if (index==4) {
+        // Open Window to allow user to draw shapes
+        qDebug() << "Custom";
+        m_drawWidget->show();
+    } else {
+        m_drawWidget->clearPoints();
+    }
     m_glWidget->changeCylinderShape(index);
 }

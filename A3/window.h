@@ -10,6 +10,7 @@
 #include <QColorDialog>
 #include "ui_MainWindow.h"
 #include "glwidget.h"
+#include "basicopenglview.h"
 
 class GLWidget;
 
@@ -24,7 +25,7 @@ public:
 	
 private:
         GLWidget *m_glWidget;
-
+        BasicOpenGLView *m_drawWidget;
 
     private slots:
 

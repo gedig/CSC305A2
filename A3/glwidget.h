@@ -38,6 +38,7 @@ public:
     void playPauseAnim();
     void toggleCylinder();
     void changeCylinderShape(int shape);
+    void updateCustomCylinder(QVector<QVector3D> points);
 
 protected:
     //Initialize the OpenGL Graphics Engine

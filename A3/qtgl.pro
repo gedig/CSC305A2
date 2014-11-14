@@ -10,9 +10,10 @@ INCLUDEPATH += .
 # Input
 HEADERS += glwidget.h \
     window.h \
-    foundation.h
+    basicopenglview.h
 FORMS += MainWindow.ui
 SOURCES += glwidget.cpp \
     main.cpp \
-    window.cpp
+    window.cpp \
+    basicopenglview.cpp
 QT += opengl
