@@ -21,6 +21,12 @@ The animation control buttons allow you to toggle whether or not the animation i
 and allow you to pause the animation.
 
 The dropdown for cylinder shape allows you to choose which shape is drawn along the frenet frames.
+Note: Custom cross section drawing is available under the Cylinder Shape Dropdown. 
+When selecting "Custom" a new window is opened. 
+The controls in this window are:
+	Left Click and drag to move points.
+	Right click to place a point with a line to the previous point.
+	Middle click to place a point without a line to the previous point. This is useful when drawing multiple shapes.
 
 
 Data Structures used:
